@@ -439,3 +439,8 @@ a.btn.ghost{color:var(--ink-3)}
 .adm-sec .hint{margin:6px 0}
 .pan-risk{padding:8px 10px;border-radius:8px;background:var(--warn-bg);color:var(--warn)}
 #f-pending .hint{margin:6px 0 10px}
+/* electricity estimated from new readings at the latest price */
+.est{margin-top:16px}
+.est .hb-sub{margin-top:0}
+.est .hint{margin:6px 0 0}
+#c-est:empty{display:none}

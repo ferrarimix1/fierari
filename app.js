@@ -50,13 +50,26 @@ function elPrice(el) {
   return L / K;
 }
 
+/* a month's electricity bills, as {lei, kwh} pairs that are numbers */
+function normalizeEl(a) {
+  if (!Array.isArray(a)) return [];
+  return a.filter(function (b) { return b && b.lei != null && b.kwh != null && num(Number(b.lei)) && num(Number(b.kwh)); })
+    .slice(0, MAX_EL).map(function (b) { return { lei: Number(b.lei), kwh: Number(b.kwh) }; });
+}
+
 function normalizeMonth(m) {
   var o = {};
-  /* The record can begin with the starting meter readings only: no bills, nothing to pay. */
+  /* The record can begin with the starting meter readings only: nothing to pay. It may carry that
+     month's electricity bills, so the first month has a price per kWh even without a bill of its own. */
   if (m.start) {
     o.start = true;
     o.r = (m.r || []).slice(0, 5).map(Number);
     o.p = (m.p || []).slice(0, 4).map(Number);
+    var sel = normalizeEl(m.el);
+    if (sel.length) o.el = sel;
+    var spk = elPrice(o.el);
+    if (spk == null && m.pk != null && num(Number(m.pk)) && Number(m.pk) > 0) spk = Number(m.pk);
+    if (spk != null) o.pk = spk;
     if (m.t) o.t = String(m.t);
     return o;
   }
@@ -68,8 +81,7 @@ function normalizeMonth(m) {
   /* el = the electricity bills ({lei, kwh}), pk = the price per kWh the apartments pay (from those
      bills, or carried over from an earlier month when there were none). */
   if (Array.isArray(m.el)) {
-    var el = m.el.filter(function (b) { return b && b.lei != null && b.kwh != null && num(Number(b.lei)) && num(Number(b.kwh)); })
-      .slice(0, MAX_EL).map(function (b) { return { lei: Number(b.lei), kwh: Number(b.kwh) }; });
+    var el = normalizeEl(m.el);
     if (el.length) {
       o.el = el;
       o.curent = round2(sum(el.map(function (b) { return b.lei; })));
@@ -544,6 +556,8 @@ var I18N = {
     priceCalc: '{L} ÷ {K} kWh = {p}.',
     priceUse: 'La acest preț, fiecare apartament plătește consumul propriului contor plus partea sa din contorul comun.',
     priceCarried: 'Nicio factură de curent luna aceasta: se folosește prețul din {m}.',
+    startPrice: 'Prețul curentului la pornire',
+    startPriceUse: 'Din facturile de curent din {m}. Dacă {n} nu are factură de curent, kWh-ii lui se plătesc la acest preț.',
     howTitle: 'Cum s-a calculat',
     howFor: 'Cum s-a ajuns la {v} pentru {a}',
     pickApt: 'Alege apartamentul tău mai sus ca să vezi calculul pas cu pas.',
@@ -742,6 +756,8 @@ var I18N = {
     priceCalc: '{L} ÷ {K} kWh = {p}.',
     priceUse: 'At this price, each apartment pays for its own meter plus its share of the common meter.',
     priceCarried: 'No electricity bill this month: the price from {m} is used.',
+    startPrice: 'Starting electricity price',
+    startPriceUse: 'From the electricity bills of {m}. If {n} has no electricity bill, its kWh are paid at this price.',
     howTitle: 'How it was worked out',
     howFor: 'How {a} comes to {v}',
     pickApt: 'Pick your apartment above to see the calculation step by step.',
@@ -1155,9 +1171,9 @@ function renderMonth() {
   else if (state.canEdit && i > 0) h += '<button type="button" class="btn sm" data-action="edit">' + icon('edit') + esc(tr('edit')) + '</button>';
   h += '</div></div>';
 
-  /* the starting readings: no bills, nothing to pay */
+  /* the starting readings: nothing to pay; maybe the price the next month starts from */
   if (c.start) {
-    h += '<p class="basenote">' + esc(tr('baseNote', { m: mName(i + 1) })) + '</p>' + metersHTML(i);
+    h += '<p class="basenote">' + esc(tr('baseNote', { m: mName(i + 1) })) + '</p>' + metersHTML(i) + startPriceHTML(i);
     el.innerHTML = h;
     return;
   }
@@ -1219,25 +1235,38 @@ function ruleOf(c, b) {
   return b === 'gaz' ? 'byArea' : b === 'gunoi' ? 'byFixed' : b === 'curent' ? (c.byPrice ? 'byPrice' : 'byKwh') : 'byPeople';
 }
 
+/* A price per kWh in a box: its bills (lei and kWh), the division, then a closing sentence. */
+function priceFromBillsHTML(title, pk, el, closing) {
+  var h = '<div class="pricebox"><div class="pb-head"><span class="eyebrow">' + esc(title) + '</span><b class="pb-val">' + esc(priceStr(pk)) + '</b></div>';
+  if (el && el.length) {
+    var L = sum(el.map(function (b) { return b.lei; })), K = sum(el.map(function (b) { return b.kwh; }));
+    h += '<table class="pb-tbl"><tbody>';
+    el.forEach(function (b, n) {
+      h += '<tr><th scope="row">' + esc(tr('billN', { n: n + 1 })) + '</th><td class="num">' + esc(lei(b.lei)) + '</td><td class="num">' + esc(kwhTotal(b.kwh)) + ' kWh</td></tr>';
+    });
+    if (el.length > 1) {
+      h += '<tr class="pb-tot"><th scope="row">' + esc(tr('total')) + '</th><td class="num">' + esc(lei(L)) + '</td><td class="num">' + esc(kwhTotal(K)) + ' kWh</td></tr>';
+    }
+    h += '</tbody></table><p class="pb-note">' + esc(tr('priceCalc', { L: lei(L), K: kwhTotal(K), p: priceStr(pk) })) + ' ' + esc(closing) + '</p>';
+  } else {
+    h += '<p class="pb-note">' + esc(closing) + '</p>';
+  }
+  return h + '</div>';
+}
+
 /* Where the month's price per kWh comes from: its electricity bills, or an earlier month's price. */
 function priceBoxHTML(i) {
   var c = state.comp[i], m = state.data.months[i];
-  var h = '<div class="pricebox"><div class="pb-head"><span class="eyebrow">' + esc(tr('priceTitle')) + '</span><b class="pb-val">' + esc(priceStr(c.pk)) + '</b></div>';
-  if (m.el && m.el.length) {
-    var L = sum(m.el.map(function (b) { return b.lei; })), K = sum(m.el.map(function (b) { return b.kwh; }));
-    h += '<table class="pb-tbl"><tbody>';
-    m.el.forEach(function (b, n) {
-      h += '<tr><th scope="row">' + esc(tr('billN', { n: n + 1 })) + '</th><td class="num">' + esc(lei(b.lei)) + '</td><td class="num">' + esc(kwhTotal(b.kwh)) + ' kWh</td></tr>';
-    });
-    if (m.el.length > 1) {
-      h += '<tr class="pb-tot"><th scope="row">' + esc(tr('total')) + '</th><td class="num">' + esc(lei(L)) + '</td><td class="num">' + esc(kwhTotal(K)) + ' kWh</td></tr>';
-    }
-    h += '</tbody></table><p class="pb-note">' + esc(tr('priceCalc', { L: lei(L), K: kwhTotal(K), p: priceStr(c.pk) })) + ' ' + esc(tr('priceUse')) + '</p>';
-  } else {
-    var lp = lastPrice(state.data, i);
-    h += '<p class="pb-note">' + esc(tr('priceCarried', { m: lp ? mName(lp.i) : '—' })) + ' ' + esc(tr('priceUse')) + '</p>';
-  }
-  return h + '</div>';
+  if (m.el && m.el.length) return priceFromBillsHTML(tr('priceTitle'), c.pk, m.el, tr('priceUse'));
+  var lp = lastPrice(state.data, i);
+  return priceFromBillsHTML(tr('priceTitle'), c.pk, null, tr('priceCarried', { m: lp ? mName(lp.i) : '—' }) + ' ' + tr('priceUse'));
+}
+
+/* The price the record starts with (from the starting month's own bills), for a first month without a bill. */
+function startPriceHTML(i) {
+  var m = state.data.months[i];
+  if (!num(m.pk)) return '';
+  return priceFromBillsHTML(tr('startPrice'), m.pk, m.el, tr('startPriceUse', { m: mName(i), n: mName(i + 1) }));
 }
 
 function narrativeHTML(i, a) {
@@ -1772,6 +1801,10 @@ function submitBase() {
   var nd = clone(state.data);
   var m = clone(sh.v.month);
   m.t = todayISO();
+  /* correcting the readings keeps the starting price and the bills it came from */
+  var old = state.data.months[0];
+  if (old.el) m.el = clone(old.el);
+  if (num(old.pk)) m.pk = old.pk;
   nd.months[0] = m;
   saveData(nd, { type: 'base', index: 0 });
 }
@@ -2540,6 +2573,8 @@ Object.assign(I18N.ro, {
   citLock: 'Închide panoul pe acest dispozitiv',
   citSent: 'Ultimele citiri au fost trimise pe {d}. Le poți corecta trimițându-le din nou.',
   pendTitle: 'Citiri noi pentru {m}',
+  estTitle: 'Curentul estimat, la {p}',
+  estNote: 'Consumul înmulțit cu prețul din {m}. Suma finală se vede după ce se adaugă luna, cu facturile ei, dacă are.',
   pendNote: 'Trimise pe {d}. Facturile lunii nu sunt adăugate încă; consumul e față de ultima citire.',
   pendLast: 'Ultima citire',
   pendNew: 'Citirea nouă',
@@ -2639,6 +2674,8 @@ Object.assign(I18N.en, {
   citLock: 'Close the panel on this device',
   citSent: 'The last readings were sent on {d}. You can correct them by sending them again.',
   pendTitle: 'New readings for {m}',
+  estTitle: 'Electricity, estimated at {p}',
+  estNote: 'The use times the price from {m}. The final amount shows once the month is added, with its bills, if any.',
   pendNote: "Sent on {d}. The month's bills are not added yet; the use is since the last reading.",
   pendLast: 'Last reading',
   pendNew: 'New reading',
@@ -3122,8 +3159,32 @@ function frontEmptyHTML() {
   var h = '<section class="panel stmt" aria-labelledby="f-title"><p class="eyebrow">' + esc(tr('fEyebrow')) + '</p>' +
     '<h2 class="mtitle f-empty-title" id="f-title">' + esc(tr('fEmptyTitle')) + '</h2>' +
     '<p class="stmt-lead">' + esc(tr('fEmptyText', { m: mName(n) })) + '</p>';
-  if (last && last.start) h += metersHTML(n - 1);
+  if (last && last.start) h += metersHTML(n - 1) + startPriceHTML(n - 1);
   return h + '</section>' + pendingHTML() + '<section class="panel" id="rules-panel" aria-labelledby="rules-title"></section>';
+}
+
+/* The electricity of new readings, before the month's bills: the use since the last readings at
+   the latest price per kWh, split like a month is (own meter + floor-area share of the common one),
+   rounded so the four add up to the total. Null without a price or with a reading below the last. */
+function elEstimate(r) {
+  var ms = state.data.months, n = ms.length, last = ms[n - 1].r, lp = lastPrice(state.data, n);
+  if (!lp || !r || r.length !== METERS.length || !r.every(num)) return null;
+  var kwh = METERS.map(function (j) { return r[j] - last[j]; });
+  if (kwh.some(function (k) { return k < 0; })) return null;
+  var sh = shares(state.data.settings.surfaces);
+  var pay = APTS.map(function (a) { return kwh[a] + sh[a] * kwh[4]; });
+  var K = sum(kwh), due = Math.round(K * lp.pk * 100);
+  return { pk: lp.pk, from: lp.i, kwh: kwh, pay: pay, K: K, due: due, cents: splitCents(pay.map(function (k) { return k * lp.pk; }), due) };
+}
+
+function estimateHTML(e) {
+  var h = '<div class="est"><p class="hb-sub">' + esc(tr('estTitle', { p: priceStr(e.pk) })) + '</p><div class="scroll"><table class="tbl hb-tbl"><thead><tr>' +
+    '<th scope="col">' + esc(tr('fColApt')) + '</th><th scope="col" class="num">' + esc(tr('fColPay')) + '</th><th scope="col" class="num">' + esc(tr('fColLei')) + '</th></tr></thead><tbody>';
+  APTS.forEach(function (a) {
+    h += '<tr><th scope="row"><span class="key a' + a + '" aria-hidden="true"></span> ' + esc(aptName(a)) + '</th><td class="num">' + esc(kwhStr(e.pay[a])) + '</td><td class="num">' + esc(money(e.cents[a] / 100)) + '</td></tr>';
+  });
+  return h + '</tbody><tfoot><tr><th scope="row">' + esc(tr('total')) + '</th><td class="num">' + esc(kwhStr(e.K)) + '</td><td class="num">' + esc(money(e.due / 100)) + '</td></tr></tfoot></table></div>' +
+    '<p class="hint">' + esc(tr('estNote', { m: mName(e.from) })) + '</p></div>';
 }
 
 /* ------------------------------------------------------------------ readings sent through the panel
@@ -3155,7 +3216,10 @@ function pendingHTML() {
     h += '<tr><th scope="row">' + key + esc(meterName(j)) + '</th><td><span class="drum">' + esc(drum(p.last[j])) + '</span></td><td><span class="drum">' + esc(drum(p.r[j])) + '</span></td>' +
       '<td class="num">' + esc(kwhStr(p.r[j] - p.last[j])) + ' kWh</td></tr>';
   });
-  return h + '</tbody></table></div></section>';
+  h += '</tbody></table></div>';
+  var e = elEstimate(p.r);
+  if (e) h += estimateHTML(e);
+  return h + '</section>';
 }
 
 /* the owner's form for the next month starts from the readings sent through the panel */
@@ -3334,7 +3398,7 @@ function renderPanel() {
         '<input type="text" id="' + id + '" data-cit="' + j + '" inputmode="decimal" autocomplete="off" spellcheck="false" enterkeyhint="next" value="' + esc(c.draft[j]) + '" aria-describedby="' + id + '-i ' + id + '-m">' +
         '<small class="info" id="' + id + '-i"></small><small class="msg" id="' + id + '-m"></small></div>';
     });
-    h += '</div><p class="sheet-msg" id="c-msg" role="status"></p><div class="sheet-actions"><button type="submit" class="btn primary" id="c-save">' + icon('check') + esc(tr('citSave')) + '</button>' +
+    h += '</div><div id="c-est" aria-live="polite"></div><p class="sheet-msg" id="c-msg" role="status"></p><div class="sheet-actions"><button type="submit" class="btn primary" id="c-save">' + icon('check') + esc(tr('citSave')) + '</button>' +
       '<button type="button" class="btn ghost" data-action="cit-lock">' + esc(tr('citLock')) + '</button></div></form>';
   }
   root.innerHTML = h + '</section><footer class="foot" id="foot"></footer></main>';
@@ -3371,6 +3435,9 @@ function refreshCit(all) {
     inp.setAttribute('aria-invalid', show ? 'true' : 'false');
     info.textContent = tr('lastRead', { v: kwhStr(last[j]) }) + (e ? '' : ' · ' + tr('usageNow', { v: kwhStr(chk.r[j] - last[j]) }));
   });
+  /* with all five readings in, what the electricity comes to at the latest price */
+  var box = $('c-est'), est = chk.ok ? elEstimate(chk.r) : null;
+  if (box) box.innerHTML = est ? estimateHTML(est) : '';
   return chk;
 }
 
