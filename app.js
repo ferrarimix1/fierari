@@ -22,6 +22,7 @@ var METERS = [0, 1, 2, 3, 4];
 var LIMIT_BILL = 100000;
 var LIMIT_KWH = 10000;
 var MAX_EL = 6;
+var LIMIT_PK = 10;
 
 /* ------------------------------------------------------------------ page source */
 
@@ -176,6 +177,11 @@ function round2(v) {
   return Math.round(v * 100) / 100;
 }
 
+/* a price per kWh as it is typed and shown: at most 6 decimals */
+function round6(v) {
+  return Math.round(v * 1e6) / 1e6;
+}
+
 function shares(surfaces) {
   var t = sum(surfaces);
   return surfaces.map(function (v) { return t > 0 ? v / t : 0; });
@@ -247,7 +253,8 @@ function computeAll(data) {
 /* ------------------------------------------------------------------ input parsing */
 
 /* Reads "269,4", "269.4", "150+120" or "88+4*22". Decimals may use a comma or a point.
-   kind: "money" (sums allowed) or "plain" (a single number). */
+   kind: "money" (sums allowed), "price" (the same, and three decimals are decimals, as in 1,115)
+   or "plain" (a single number). */
 function parseExpr(text, kind) {
   var src = String(text == null ? '' : text).trim();
   if (!src) return { empty: true };
@@ -257,7 +264,7 @@ function parseExpr(text, kind) {
   function number() {
     var m = /^(\d+)(?:[.,](\d+))?/.exec(s.slice(pos));
     if (!m) { err = err || 'number'; return NaN; }
-    if (m[2] && m[2].length === 3) err = err || 'thousands';
+    if (m[2] && m[2].length === 3 && kind !== 'price') err = err || 'thousands';
     if (/^[.,]\d/.test(s.slice(pos + m[0].length))) err = err || 'thousands';
     pos += m[0].length;
     return parseFloat(m[1] + (m[2] ? '.' + m[2] : ''));
@@ -344,45 +351,28 @@ function validateDraft(data, i, d) {
     }
   });
 
-  /* Electricity bills: each row is one bill's total (lei) and the kWh it bills. Empty rows are
-     skipped; with no bill at all the last month's price carries over. */
+  /* Electricity: the price per kWh this month's kWh are paid at (the form starts it at the latest
+     price). A month that came with its electricity bills keeps them while its price is left as it was. */
   if (elMode) {
-    var rows = [], rowsOk = true;
-    (d.el || []).forEach(function (row, n) {
-      var l = parseExpr(row && row.l, 'money'), k = parseExpr(row && row.k, 'money');
-      if (l.empty && k.empty) return;
-      var good = true;
-      [['l', l, LIMIT_BILL], ['k', k, LIMIT_BILL]].forEach(function (x) {
-        var key = 'el' + n + x[0], r = x[1];
-        if (r.empty) { errors[key] = { code: 'required' }; good = false; }
-        else if (r.error) { errors[key] = { code: r.error === 'plain' ? 'number' : r.error }; good = false; }
-        else if (Math.abs(r.value) > x[2]) { errors[key] = { code: 'tooBig' }; good = false; }
-      });
-      if (good) rows.push({ lei: l.value, kwh: k.value });
-      else rowsOk = false;
-    });
     var lp = lastPrice(data, i);
-    elInfo = { rows: rows, pk: null, from: null, L: null, K: null };
-    if (rowsOk && rows.length) {
-      var L = sum(rows.map(function (b) { return b.lei; })), Kb = sum(rows.map(function (b) { return b.kwh; }));
-      elInfo.L = L;
-      elInfo.K = Kb;
-      if (!(Kb > 0)) global.push({ code: 'elKwh' });
-      else if (!(L / Kb > 0)) global.push({ code: 'elPrice' });
+    var pkText = String(d.pk == null ? '' : d.pk).trim();
+    elInfo = { pk: null, bills: false };
+    if (d.keepEl && d.keepEl.length && pkText === d.keepPk) {
+      out.el = d.keepEl;
+      elInfo.pk = elPrice(d.keepEl);
+      elInfo.bills = true;
+    } else {
+      var pr = parseExpr(pkText, 'price');
+      if (pr.empty) errors.pk = { code: 'required' };
+      else if (pr.error) errors.pk = { code: pr.error === 'plain' ? 'number' : pr.error };
+      else if (!(pr.value > 0)) errors.pk = { code: 'positive' };
+      else if (pr.value > LIMIT_PK) errors.pk = { code: 'pkBig' };
       else {
-        elInfo.pk = L / Kb;
-        out.curent = round2(L);
-        out.el = rows;
+        elInfo.pk = round6(pr.value);
         out.pk = elInfo.pk;
-        if (lp && (elInfo.pk > lp.pk * 1.5 || elInfo.pk < lp.pk / 1.5)) warnings.el = { code: 'priceOff', v: lp.pk };
-      }
-    } else if (rowsOk) {
-      if (lp) {
-        elInfo.pk = lp.pk;
-        elInfo.from = lp.i;
         out.curent = 0;
-        out.pk = lp.pk;
-      } else global.push({ code: 'elNeeded' });
+        if (lp && (elInfo.pk > lp.pk * 1.5 || elInfo.pk < lp.pk / 1.5)) warnings.pk = { code: 'priceOff', v: lp.pk };
+      }
     }
   }
 
@@ -555,9 +545,10 @@ var I18N = {
     billN: 'Factura {n}',
     priceCalc: '{L} ÷ {K} kWh = {p}.',
     priceUse: 'La acest preț, fiecare apartament plătește consumul propriului contor plus partea sa din contorul comun.',
-    priceCarried: 'Nicio factură de curent luna aceasta: se folosește prețul din {m}.',
+    priceSame: 'Același preț ca în {m}.',
+    priceWas: 'În {m} a fost {p}.',
     startPrice: 'Prețul curentului la pornire',
-    startPriceUse: 'Din facturile de curent din {m}. Dacă {n} nu are factură de curent, kWh-ii lui se plătesc la acest preț.',
+    startPriceUse: 'Din facturile de curent din {m}. Dacă nu se schimbă, același preț se folosește și în {n}.',
     howTitle: 'Cum s-a calculat',
     howFor: 'Cum s-a ajuns la {v} pentru {a}',
     pickApt: 'Alege apartamentul tău mai sus ca să vezi calculul pas cu pas.',
@@ -606,7 +597,7 @@ var I18N = {
     ruleGaz: 'Gazul se împarte după cota de suprafață a fiecărui apartament.',
     rulePeople: 'DIGI și apa se împart după numărul de persoane din luna respectivă.',
     ruleGunoi: 'Gunoiul nu se împarte: fiecare apartament plătește aceeași sumă fixă, {v} pe lună.',
-    ruleKwh: 'Fiecare apartament plătește consumul de pe propriul contor. Doar consumul contorului comun se împarte, după cota de suprafață. Toți kWh-ii se plătesc la prețul din facturile de curent ale lunii (total lei ÷ total kWh facturați).',
+    ruleKwh: 'Fiecare apartament plătește consumul de pe propriul contor. Doar consumul contorului comun se împarte, după cota de suprafață. Toți kWh-ii se plătesc la prețul pe kWh al lunii, din factura de curent.',
     ruleKwhOld: 'Până în {m} inclusiv, factura de curent s-a împărțit proporțional cu acești kWh.',
     ruleKwhMixed: 'Unele luni au împărțit factura de curent proporțional cu acești kWh; fiecare lună arată regula folosită.',
     ruleKwhProp: 'Curentul se împarte după kWh: consumul contorului propriu plus partea din consumul comun (după cota de suprafață), raportat la consumul celor 5 contoare.',
@@ -623,18 +614,15 @@ var I18N = {
     close: 'Închide',
     secBills: 'Facturi (lei)',
     exprHint: 'Poți scrie și un calcul, de ex. 150+120. Zecimalele merg cu virgulă sau cu punct.',
-    secEl: 'Facturile de curent ale lunii',
     modePrice: 'După preț pe kWh',
     modeProp: 'Proporțional',
     elAmount: 'Factura de curent (lei)',
     propHint: 'Factura se împarte proporțional cu kWh-ul fiecărui apartament (contorul propriu plus partea din contorul comun), ca în Excel.',
-    elLei: 'Total de plată (lei)',
-    elKwh: 'Consum facturat (kWh)',
-    elAdd: 'Adaugă o factură',
-    elDel: 'Șterge factura {n}',
-    elHint: 'Pentru fiecare factură de curent scrie totalul de plată și kWh-ul facturat. Prețul pe kWh = total lei ÷ total kWh. Dacă luna aceasta nu ai nicio factură, lasă gol: se folosește prețul de luna trecută.',
-    elPriceLive: 'Preț: {p} ({L} ÷ {K} kWh)',
-    elPriceCarry: 'Fără factură: se folosește prețul din {m}, {p}.',
+    pkField: 'Preț pe kWh (lei)',
+    pkLast: 'prețul din {m}: {p}',
+    pkBills: 'din facturile lunii: {L} ÷ {K} kWh',
+    pkHint: 'Pornește de la ultimul preț. Dacă s-a schimbat, scrie prețul nou. Poți scrie și împărțirea de pe factură, de ex. 1099,43/990 (lei ÷ kWh).',
+    elDueLive: 'Curentul lunii: {k} kWh × {p} = {v}',
     secReadings: 'Citiri contoare (kWh)',
     lastRead: 'luna trecută: {v}',
     usageNow: 'consum: {v} kWh',
@@ -669,15 +657,13 @@ var I18N = {
     ePersons: 'Un număr întreg între 0 și 20.',
     ePersonsZero: 'Trebuie să fie cel puțin o persoană în casă.',
     eKwhZero: 'Consumul total este 0 kWh, dar factura de curent nu e 0.',
-    eElNeeded: 'Adaugă cel puțin o factură de curent: nu există un preț de luna trecută.',
-    eElKwh: 'Facturile de curent trebuie să aibă împreună peste 0 kWh.',
-    eElPrice: 'Prețul pe kWh trebuie să fie peste 0. Verifică sumele.',
+    ePkBig: 'Preț prea mare pentru un kWh. Scrie-l în lei, de ex. 1,11.',
     eNextLower: 'Cu această citire, {m} ar avea consum negativ la {x}.',
     eNote: 'Cel mult 200 de caractere.',
     ePositive: 'Un număr mai mare decât 0.',
     wBillHigh: 'Mult peste ultimele luni (maximum {v}). Verifică.',
     wKwhHigh: 'Consum mult peste ultimele luni (maximum {v} kWh). Verifică.',
-    wPriceOff: 'Prețul e mult diferit de cel anterior ({v}). Verifică sumele și kWh-ul de pe facturi.',
+    wPriceOff: 'Mult diferit de prețul anterior ({v}). Verifică.',
     savedT: '{m} a fost salvată.',
     deletedT: '{m} a fost ștearsă.',
     settingsT: 'Setările au fost salvate.',
@@ -755,9 +741,10 @@ var I18N = {
     billN: 'Bill {n}',
     priceCalc: '{L} ÷ {K} kWh = {p}.',
     priceUse: 'At this price, each apartment pays for its own meter plus its share of the common meter.',
-    priceCarried: 'No electricity bill this month: the price from {m} is used.',
+    priceSame: 'The same price as in {m}.',
+    priceWas: 'In {m} it was {p}.',
     startPrice: 'Starting electricity price',
-    startPriceUse: 'From the electricity bills of {m}. If {n} has no electricity bill, its kWh are paid at this price.',
+    startPriceUse: 'From the electricity bills of {m}. Unless it changes, {n} uses the same price.',
     howTitle: 'How it was worked out',
     howFor: 'How {a} comes to {v}',
     pickApt: 'Pick your apartment above to see the calculation step by step.',
@@ -806,7 +793,7 @@ var I18N = {
     ruleGaz: "Gas is split by each apartment's share of the floor area.",
     rulePeople: 'DIGI and water are split by the number of people living there that month.',
     ruleGunoi: 'Rubbish is not split: every apartment pays the same fixed amount, {v} a month.',
-    ruleKwh: "Each apartment pays for the use on its own meter. Only the common meter's use is split, by floor-area share. All kWh are paid at the price from that month's electricity bills (total lei ÷ total kWh billed).",
+    ruleKwh: "Each apartment pays for the use on its own meter. Only the common meter's use is split, by floor-area share. All kWh are paid at the month's price per kWh, from the electricity bill.",
     ruleKwhOld: 'Up to and including {m}, the electricity bill was shared out in proportion to these kWh.',
     ruleKwhMixed: 'Some months shared out the electricity bill in proportion to these kWh instead; each month shows the rule it used.',
     ruleKwhProp: "Electricity is split by kWh: each apartment's own meter plus its floor-area share of the common meter, out of the total on all 5 meters.",
@@ -823,18 +810,15 @@ var I18N = {
     close: 'Close',
     secBills: 'Bills (lei)',
     exprHint: 'You can also type a sum, e.g. 150+120. Decimals work with a comma or a point.',
-    secEl: "This month's electricity bills",
     modePrice: 'By price per kWh',
     modeProp: 'Proportional',
     elAmount: 'Electricity bill (lei)',
     propHint: "The bill is shared out in proportion to each apartment's kWh (its own meter plus its share of the common meter), as in the Excel.",
-    elLei: 'Total to pay (lei)',
-    elKwh: 'Billed use (kWh)',
-    elAdd: 'Add a bill',
-    elDel: 'Remove bill {n}',
-    elHint: "For each electricity bill, type its total to pay and the kWh it bills. Price per kWh = total lei ÷ total kWh. If there is no bill this month, leave this empty: last month's price is used.",
-    elPriceLive: 'Price: {p} ({L} ÷ {K} kWh)',
-    elPriceCarry: 'No bill: the price from {m} is used, {p}.',
+    pkField: 'Price per kWh (lei)',
+    pkLast: 'price in {m}: {p}',
+    pkBills: "from the month's bills: {L} ÷ {K} kWh",
+    pkHint: 'It starts at the latest price. If the price changed, type the new one. You can also type the division from the bill, e.g. 1099.43/990 (lei ÷ kWh).',
+    elDueLive: "This month's electricity: {k} kWh × {p} = {v}",
     secReadings: 'Meter readings (kWh)',
     lastRead: 'last month: {v}',
     usageNow: 'use: {v} kWh',
@@ -869,15 +853,13 @@ var I18N = {
     ePersons: 'A whole number from 0 to 20.',
     ePersonsZero: 'At least one person must live in the house.',
     eKwhZero: 'Total use is 0 kWh, but the electricity bill is not 0.',
-    eElNeeded: 'Add at least one electricity bill: there is no earlier price to use.',
-    eElKwh: 'The electricity bills must add up to more than 0 kWh.',
-    eElPrice: 'The price per kWh must be above 0. Check the amounts.',
+    ePkBig: 'Too high for one kWh. Type the price in lei, e.g. 1.11.',
     eNextLower: 'With this reading, {m} would have negative use on {x}.',
     eNote: '200 characters at most.',
     ePositive: 'A number above 0.',
     wBillHigh: 'Well above recent months (highest {v}). Check it.',
     wKwhHigh: 'Use well above recent months (highest {v} kWh). Check it.',
-    wPriceOff: 'The price is far from the previous one ({v}). Check the amounts and kWh on the bills.',
+    wPriceOff: 'Far from the previous price ({v}). Check it.',
     savedT: '{m} saved.',
     deletedT: '{m} deleted.',
     settingsT: 'Settings saved.',
@@ -965,7 +947,8 @@ function money(n) { return fmt(n, 2, 2, true); }
 function lei(n) { return money(n) + '\u00a0lei'; }
 function kwhStr(n) { return fmt(num(n) ? Math.round(n * 100) / 100 : n, 0, 2, false); }
 function kwhTotal(n) { return fmt(num(n) ? Math.round(n * 100) / 100 : n, 0, 2, true); }
-function priceStr(p) { return fmt(p, 4, 4, false) + ' lei/kWh'; }
+/* a price per kWh with the decimals it was typed with (up to 6), so it can be checked by hand */
+function priceStr(p) { return fmt(p, 2, 6, false) + ' lei/kWh'; }
 function pct(n) { return fmt(n * 100, 2, 2, false) + (state.lang === 'ro' ? '\u00a0%' : '%'); }
 function drum(v) {
   if (!num(v)) return '—';
@@ -1254,12 +1237,14 @@ function priceFromBillsHTML(title, pk, el, closing) {
   return h + '</div>';
 }
 
-/* Where the month's price per kWh comes from: its electricity bills, or an earlier month's price. */
+/* The month's price per kWh: from its electricity bills when it has them, else the price set for
+   it, next to the month before's. */
 function priceBoxHTML(i) {
   var c = state.comp[i], m = state.data.months[i];
   if (m.el && m.el.length) return priceFromBillsHTML(tr('priceTitle'), c.pk, m.el, tr('priceUse'));
-  var lp = lastPrice(state.data, i);
-  return priceFromBillsHTML(tr('priceTitle'), c.pk, null, tr('priceCarried', { m: lp ? mName(lp.i) : '—' }) + ' ' + tr('priceUse'));
+  var lp = lastPrice(state.data, i), was = '';
+  if (lp) was = round6(lp.pk) === round6(c.pk) ? tr('priceSame', { m: mName(lp.i) }) : tr('priceWas', { m: mName(lp.i), p: priceStr(lp.pk) });
+  return priceFromBillsHTML(tr('priceTitle'), c.pk, null, (was ? was + ' ' : '') + tr('priceUse'));
 }
 
 /* The price the record starts with (from the starting month's own bills), for a first month without a bill. */
@@ -1607,20 +1592,14 @@ function renderFooter() {
 
 /* ------------------------------------------------------------------ forms */
 
-function emptyElRows(n) {
-  var rows = [];
-  for (var k = 0; k < n; k++) rows.push({ l: '', k: '' });
-  return rows;
-}
-
-/* New months start on the price per kWh; DIGI and rubbish carry over from the month before. */
+/* New months start on the price per kWh, at the latest price; DIGI and rubbish carry over from the month before. */
 var DEFAULT_DIGI = 98, DEFAULT_GUNOI = 22;
 function draftForAdd() {
-  var ms = state.data.months, last = ms[ms.length - 1];
+  var ms = state.data.months, last = ms[ms.length - 1], lp = lastPrice(state.data, ms.length);
   return {
     gaz: '', digi: num(last.digi) ? last.digiText || numToInput(last.digi) : numToInput(DEFAULT_DIGI),
     gunoi: numToInput(num(last.gunoi) ? last.gunoi : DEFAULT_GUNOI), apa: '', curent: '',
-    elMode: true, el: emptyElRows(Math.min(MAX_EL, Math.max(2, last.el ? last.el.length : 0))),
+    elMode: true, pk: lp ? numToInput(round6(lp.pk)) : '',
     r: ['', '', '', '', ''], x: [false, false, false, false, false], o: ['', '', '', '', ''],
     p: last.p.map(String), g: ['', '', ''], note: ''
   };
@@ -1633,29 +1612,25 @@ function fixDraft(d, base) {
   ['r', 'x', 'o', 'p', 'g'].forEach(function (k) {
     if (!Array.isArray(o[k]) || o[k].length !== base[k].length) o[k] = base[k];
   });
-  if (!Array.isArray(o.el) || !o.el.length) o.el = base.el;
-  o.el = o.el.slice(0, MAX_EL).map(function (row) { return { l: row && row.l != null ? String(row.l) : '', k: row && row.k != null ? String(row.k) : '' }; });
+  o.pk = String(o.pk);
   o.elMode = d && typeof d.elMode === 'boolean' ? d.elMode : base.elMode;
   return o;
 }
 
-/* A month's electricity as bill rows, for switching it to the price per kWh: the amounts it was
-   entered with ("208+134" gives two bills), with the kWh still to fill in. */
-function rowsFromAmount(m) {
-  var parts = [];
-  if (m.curentText && /^\d+(\.\d+)?(\+\d+(\.\d+)?)+$/.test(m.curentText)) parts = m.curentText.split('+').map(Number);
-  else if (num(m.curent) && m.curent > 0) parts = [m.curent];
-  var rows = parts.slice(0, MAX_EL).map(function (v) { return { l: numToInput(v), k: '' }; });
-  return rows.length ? rows : emptyElRows(2);
-}
-
-/* Both ways of entering the electricity are filled in, so the form can switch between them. */
-function draftFromMonth(m) {
+/* A month already saved, in the form. A month recorded the old way (its electricity bill shared out
+   in proportion to the kWh) can stay that way or move to a price per kWh; a month with its
+   electricity bills keeps them while its price is left as it was. */
+function draftFromMonth(m, i) {
   var d = { r: [], x: [], o: [], p: m.p.map(String), g: ['', '', ''], note: m.note || '' };
   BILLS.forEach(function (b) { d[b] = m[b + 'Text'] || numToInput(m[b]); });
   d.elMode = num(m.pk);
-  d.el = m.el ? m.el.map(function (b) { return { l: numToInput(b.lei), k: numToInput(b.kwh) }; }) :
-    d.elMode ? emptyElRows(2) : rowsFromAmount(m);
+  d.propOld = !d.elMode;
+  var lp = d.elMode ? { pk: m.pk } : lastPrice(state.data, i);
+  d.pk = lp ? numToInput(round6(lp.pk)) : '';
+  if (m.el && m.el.length) {
+    d.keepEl = clone(m.el);
+    d.keepPk = d.pk;
+  }
   METERS.forEach(function (j) {
     d.r[j] = numToInput(m.r[j]);
     var has = !!(m.kwh && m.kwh[j] != null);
@@ -1678,7 +1653,7 @@ function openMonthSheet(mode, index, draft) {
     }
     draft = draft ? fixDraft(draft, draftForAdd()) : draftForAdd();
   } else {
-    draft = draftFromMonth(state.data.months[index]);
+    draft = draftFromMonth(state.data.months[index], index);
   }
   state.sheet = { kind: 'month', mode: mode, index: index, draft: draft, touched: {}, submitted: false, saving: false, opener: document.activeElement };
   renderSheet();
@@ -1711,38 +1686,30 @@ function inputField(f, label, value, mode, extra) {
     '<small class="msg" id="' + id + '-m"></small></div>';
 }
 
-/* The electricity part of the form: a switch for how the month's electricity is split, then
-   either its bills (price per kWh) or the one amount shared out in proportion (the Excel's rule). */
-function elBoxHTML(d) {
-  var h = '<div class="elbox"><div class="elmode"><p class="elhead" id="el-title">' + esc(tr('curentP')) + '</p>' +
-    '<div class="elseg" role="radiogroup" aria-labelledby="el-title">';
-  [['price', 'modePrice', true], ['prop', 'modeProp', false]].forEach(function (o) {
-    h += '<label class="segopt"><input type="radio" name="elmode" id="f-elmode-' + o[0] + '" value="' + o[0] + '" data-f="elmode"' +
-      (!!d.elMode === o[2] ? ' checked' : '') + '><span>' + esc(tr(o[1])) + '</span></label>';
-  });
-  h += '</div></div>';
-  if (d.elMode) h += elBillsHTML(d) + '<p class="hint">' + esc(tr('elHint')) + '</p>';
-  else h += '<div class="fgrid three">' + inputField('curent', tr('elAmount'), d.curent, 'text') + '</div><p class="hint">' + esc(tr('propHint')) + '</p>';
-  return h + '</div>';
-}
-
-/* One row per electricity bill: its total (lei) and the kWh it bills. */
-function elBillsHTML(d) {
-  var h = '<div class="elgrid" role="group" aria-label="' + esc(tr('secEl')) + '"><span aria-hidden="true"></span><span class="elcol" aria-hidden="true">' + esc(tr('elLei')) + '</span>' +
-    '<span class="elcol" aria-hidden="true">' + esc(tr('elKwh')) + '</span><span aria-hidden="true"></span>';
-  d.el.forEach(function (row, n) {
-    var bn = tr('billN', { n: n + 1 });
-    h += '<span class="eln" aria-hidden="true">' + (n + 1) + '</span>';
-    [['l', tr('elLei'), 'text'], ['k', tr('elKwh'), 'decimal']].forEach(function (c) {
-      var f = 'el' + n + c[0], id = 'f-' + f;
-      h += '<div class="field" data-wrap="' + f + '"><input type="text" id="' + id + '" data-f="' + f + '" inputmode="' + c[2] + '" autocomplete="off" spellcheck="false" enterkeyhint="next" value="' +
-        esc(row[c[0]]) + '" aria-label="' + esc(bn + ', ' + c[1]) + '" aria-describedby="' + id + '-m"><small class="msg" id="' + id + '-m"></small></div>';
+/* The electricity part of the form: the price per kWh the month's kWh are paid at, with the
+   amount it comes to. A month recorded the old way also gets a switch to its proportional split. */
+function elBoxHTML(d, i) {
+  var h = '<div class="elbox"><div class="elmode"><p class="elhead" id="el-title">' + esc(tr('curentP')) + '</p>';
+  if (d.propOld) {
+    h += '<div class="elseg" role="radiogroup" aria-labelledby="el-title">';
+    [['price', 'modePrice', true], ['prop', 'modeProp', false]].forEach(function (o) {
+      h += '<label class="segopt"><input type="radio" name="elmode" id="f-elmode-' + o[0] + '" value="' + o[0] + '" data-f="elmode"' +
+        (!!d.elMode === o[2] ? ' checked' : '') + '><span>' + esc(tr(o[1])) + '</span></label>';
     });
-    h += '<button type="button" class="icon-btn el-del" data-action="el-del" data-n="' + n + '" aria-label="' + esc(tr('elDel', { n: n + 1 })) + '">' + icon('x') + '</button>';
-  });
+    h += '</div>';
+  }
   h += '</div>';
-  if (d.el.length < MAX_EL) h += '<button type="button" class="btn sm el-add" data-action="el-add">' + icon('plus') + esc(tr('elAdd')) + '</button>';
-  return h + '<p class="elprice" id="elprice"></p>';
+  if (d.elMode) {
+    var info = '', lp = lastPrice(state.data, i);
+    if (d.keepEl && d.keepEl.length) {
+      info = tr('pkBills', { L: lei(sum(d.keepEl.map(function (b) { return b.lei; }))), K: kwhTotal(sum(d.keepEl.map(function (b) { return b.kwh; }))) });
+    } else if (lp) info = tr('pkLast', { m: mName(lp.i), p: priceStr(lp.pk) });
+    h += '<div class="fgrid three">' + inputField('pk', tr('pkField'), d.pk, 'text', { info: info }) + '</div>' +
+      '<p class="elprice" id="elprice"></p><p class="hint">' + esc(tr('pkHint')) + '</p>';
+  } else {
+    h += '<div class="fgrid three">' + inputField('curent', tr('elAmount'), d.curent, 'text') + '</div><p class="hint">' + esc(tr('propHint')) + '</p>';
+  }
+  return h + '</div>';
 }
 
 function peopleFieldsetHTML(d) {
@@ -1819,7 +1786,7 @@ function monthSheetHTML(sh) {
     '<form class="sheet-body" id="mform" novalidate>';
   h += '<fieldset class="fs"><legend class="eyebrow">' + esc(tr('secBills')) + '</legend><div class="fgrid four">';
   ['gaz', 'digi', 'gunoi', 'apa'].forEach(function (b) { h += inputField(b, tr(b === 'gunoi' ? 'gunoiField' : b), d[b], 'text'); });
-  h += '</div>' + elBoxHTML(d) + '<p class="hint">' + esc(tr('exprHint')) + '</p></fieldset>';
+  h += '</div>' + elBoxHTML(d, i) + '<p class="hint">' + esc(tr('exprHint')) + '</p></fieldset>';
   h += '<fieldset class="fs"><legend class="eyebrow">' + eyebrow(tr('secReadings')) + '</legend><div class="fgrid five">';
   METERS.forEach(function (j) {
     var id = 'f-r' + j;
@@ -1890,7 +1857,7 @@ function renderSheet() {
   setSaving(sh.saving);
 }
 
-/* Redraws the open form (after a bill row is added or removed) without losing the scroll position. */
+/* Redraws the open form (after switching how its electricity is split) without losing the scroll position. */
 function rerenderSheet(focusId) {
   var card = root.querySelector('.sheet-card');
   var top = card ? card.scrollTop : 0;
@@ -1908,7 +1875,7 @@ function errText(e) {
   var map = {
     required: 'eRequired', number: 'eNumber', plain: 'ePlain', thousands: 'eThousands', tooBig: 'eTooBig', negative: 'eNegative',
     kwhBig: 'eKwhBig', override: 'eOverride', persons: 'ePersons', personsZero: 'ePersonsZero', kwhZero: 'eKwhZero', note: 'eNote', positive: 'ePositive',
-    elNeeded: 'eElNeeded', elKwh: 'eElKwh', elPrice: 'eElPrice'
+    pkBig: 'ePkBig'
   };
   return tr(map[c] || 'eNumber');
 }
@@ -1938,20 +1905,16 @@ function setFieldMsg(f, e, w, show) {
 
 /* The form's fields in screen order, for messages and for focusing the first problem. */
 function formKeys(d) {
-  var keys = d.elMode ? ['gaz', 'digi', 'gunoi', 'apa'] : BILLS.slice();
-  if (d.elMode) d.el.forEach(function (_, n) { keys.push('el' + n + 'l', 'el' + n + 'k'); });
+  var keys = d.elMode ? ['gaz', 'digi', 'gunoi', 'apa', 'pk'] : BILLS.slice();
   return keys.concat(['r0', 'r1', 'r2', 'r3', 'r4', 'o0', 'o1', 'o2', 'o3', 'o4', 'p0', 'p1', 'p2', 'p3', 'note', 'g0', 'g1', 'g2']);
 }
 
+/* what the month's electricity comes to at that price, once the readings give its kWh */
 function refreshElPrice(sh, v) {
   var el = $('elprice');
   if (!el) return;
-  var e = v.el, t = '', cls = 'elprice';
-  if (e && e.pk != null && e.from == null) t = tr('elPriceLive', { p: priceStr(e.pk), L: lei(e.L), K: kwhTotal(e.K) });
-  else if (e && e.pk != null) t = tr('elPriceCarry', { m: mName(e.from), p: priceStr(e.pk) });
-  if (v.warnings.el && t) { t += ' ' + warnText(v.warnings.el); cls += ' warn'; }
-  el.textContent = t;
-  el.className = cls;
+  var pk = v.el && v.el.pk, K = v.usage.every(num) ? sum(v.usage) : null;
+  el.textContent = pk != null && K != null ? tr('elDueLive', { k: kwhTotal(K), p: priceStr(pk), v: lei(round2(pk * K)) }) : '';
 }
 
 function refreshSheet() {
@@ -2194,9 +2157,9 @@ function exportXlsx() {
       [tr('digi'), M2, paid(function (m) { return m.digi; })],
       [tr('gunoiField'), M2, paid(function (m) { return num(m.gunoi) ? m.gunoi : ''; })],
       [tr('apa'), M2, paid(function (m) { return m.apa; })],
-      [tr('xElLei'), M2, paid(function (m) { return m.curent; })],
+      [tr('xElLei'), M2, paid(function (m) { return num(m.pk) && !m.el ? '' : m.curent; })],
       [tr('xElKwh'), '#,##0', paid(function (m) { return m.el ? sum(m.el.map(function (b) { return b.kwh; })) : ''; })],
-      [tr('xPrice'), '0.0000', paid(function (m) { return num(m.pk) ? m.pk : ''; })],
+      [tr('xPrice'), '0.00####', paid(function (m) { return num(m.pk) ? m.pk : ''; })],
       [tr('xElDue'), M2, paid(function (m, c) { return c.manual ? '' : round2(c.elDue); })]
     ];
     METERS.forEach(function (j) { cols.push([tr('reading') + ' ' + meterName(j), null, function (m) { return m.r[j]; }]); });
@@ -2312,31 +2275,6 @@ function onClick(ev) {
     if (inp) inp.value = String(nv);
     refreshSheet();
     saveLocalDraft();
-  } else if (act === 'el-add' || act === 'el-del') {
-    var s3 = state.sheet;
-    if (!s3 || s3.kind !== 'month' || !s3.draft.elMode || s3.saving) return;
-    var rows = s3.draft.el, focusId;
-    if (act === 'el-add') {
-      if (rows.length >= MAX_EL) return;
-      rows.push({ l: '', k: '' });
-      focusId = 'f-el' + (rows.length - 1) + 'l';
-    } else {
-      var at = +t.getAttribute('data-n');
-      if (rows.length > 1) rows.splice(at, 1);
-      else rows[0] = { l: '', k: '' };
-      /* messages follow their row */
-      Object.keys(s3.touched).forEach(function (k) {
-        var mt = /^el(\d+)([lk])$/.exec(k);
-        if (!mt) return;
-        delete s3.touched[k];
-        var r = +mt[1];
-        if (r > at) s3.touched['el' + (r - 1) + mt[2]] = true;
-        else if (r < at) s3.touched[k] = true;
-      });
-      focusId = rows.length ? 'f-el' + Math.min(at, rows.length - 1) + 'l' : null;
-    }
-    rerenderSheet(focusId);
-    saveLocalDraft();
   } else if (act === 'ask-delete') {
     var cf = $('confirm');
     if (cf) { cf.hidden = false; var y2 = cf.querySelector('[data-action="del-yes"]'); if (y2) y2.focus(); }
@@ -2381,9 +2319,7 @@ function onInput(ev) {
     }
     return;
   }
-  var mEl = /^el(\d+)([lk])$/.exec(f);
-  if (BILLS.indexOf(f) !== -1 || f === 'note') d[f] = t.value;
-  else if (mEl) { if (d.el[+mEl[1]]) d.el[+mEl[1]][mEl[2]] = t.value; else return; }
+  if (BILLS.indexOf(f) !== -1 || f === 'note' || f === 'pk') d[f] = t.value;
   else if (/^r[0-4]$/.test(f)) d.r[+f.slice(1)] = t.value;
   else if (/^o[0-4]$/.test(f)) d.o[+f.slice(1)] = t.value;
   else if (/^x[0-4]$/.test(f)) d.x[+f.slice(1)] = !!t.checked;
@@ -2411,17 +2347,8 @@ function onFocusOut(ev) {
   var t = ev.target, f = t.getAttribute && t.getAttribute('data-f');
   var sh = state.sheet;
   if (!f || !sh) return;
-  var keys = [f];
-  /* leaving a bill row with one half filled in flags the other half too */
-  var me = /^el(\d+)([lk])$/.exec(f);
-  if (me && String(t.value).trim() !== '') {
-    var other = 'el' + me[1] + (me[2] === 'l' ? 'k' : 'l');
-    var rel = ev.relatedTarget;
-    if (!(rel && rel.getAttribute && rel.getAttribute('data-f') === other)) keys.push(other);
-  }
-  var changed = false;
-  keys.forEach(function (k) { if (!sh.touched[k]) { sh.touched[k] = true; changed = true; } });
-  if (!changed) return;
+  if (sh.touched[f]) return;
+  sh.touched[f] = true;
   if (pointerDown) { refreshAfterClick = true; return; }
   refreshSheet();
 }
@@ -2574,7 +2501,7 @@ Object.assign(I18N.ro, {
   citSent: 'Ultimele citiri au fost trimise pe {d}. Le poți corecta trimițându-le din nou.',
   pendTitle: 'Citiri noi pentru {m}',
   estTitle: 'Curentul estimat, la {p}',
-  estNote: 'Consumul înmulțit cu prețul din {m}. Suma finală se vede după ce se adaugă luna, cu facturile ei, dacă are.',
+  estNote: 'Consumul înmulțit cu prețul din {m}. Suma finală se vede după ce se adaugă luna, cu prețul ei.',
   pendNote: 'Trimise pe {d}. Facturile lunii nu sunt adăugate încă; consumul e față de ultima citire.',
   pendLast: 'Ultima citire',
   pendNew: 'Citirea nouă',
@@ -2675,7 +2602,7 @@ Object.assign(I18N.en, {
   citSent: 'The last readings were sent on {d}. You can correct them by sending them again.',
   pendTitle: 'New readings for {m}',
   estTitle: 'Electricity, estimated at {p}',
-  estNote: 'The use times the price from {m}. The final amount shows once the month is added, with its bills, if any.',
+  estNote: 'The use times the price from {m}. The final amount shows once the month is added, with its own price.',
   pendNote: "Sent on {d}. The month's bills are not added yet; the use is since the last reading.",
   pendLast: 'Last reading',
   pendNew: 'New reading',

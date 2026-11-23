@@ -42,8 +42,8 @@ Optional: under GitHub → Settings → Pages, *verify* `avrusu.eu`, so nobody e
 ## Day to day
 
 - **Adding a month:** go to Administrare and press "Adaugă …". DIGI (98) and rubbish (22 per apartment) are filled in, and so are the meter readings if they were sent through "Trimite citirile". Type gas, water and the people.
-  - Electricity: type each bill that month (total and kWh).
-  - With no electricity bill that month, leave those rows empty: the kWh are paid at the latest price. To start with, that is November 2026's: 1,283.52 lei ÷ 1,156 kWh = 1.1103 lei/kWh.
+  - Electricity: one field, the price per kWh. It starts at the latest price; to begin with that is November 2026's, 1,283.52 lei ÷ 1,156 kWh = 1.110311 lei/kWh. Change it when the price changes.
+  - You can type the price (1,11) or the division from the bill (1099,43/990). It is kept to 6 decimals, and the line under it shows what the month's kWh come to.
   - Afterwards, "Facturile de plată" at the top goes back to the front page.
 - **Tenants:** send them the address. They can add the page to the home screen (Share → Add to Home Screen).
 - **Key expired or a phone lost:** delete the key on GitHub (Settings → Developer settings → tokens), make a new one, and use "Am o cheie GitHub nouă" under Administrare. "Cheia GitHub" → "Deconectează acest dispozitiv" makes a device forget the key and the password.
@@ -53,7 +53,7 @@ Optional: under GitHub → Settings → Pages, *verify* `avrusu.eu`, so nobody e
 - **Gas:** by floor-area share (22.38 / 19.83 / 28.23 / 29.56 %).
 - **DIGI and water:** by the number of people that month.
 - **Rubbish:** the same fixed amount per apartment.
-- **Electricity:** each apartment pays the use on its own meter, and only the common meter's use is split, by floor-area share. Every kWh is paid at that month's price: the total lei on the electricity bills ÷ the total kWh they bill.
+- **Electricity:** each apartment pays the use on its own meter, and only the common meter's use is split, by floor-area share. Every kWh is paid at that month's price per kWh, from the electricity bill.
 
 Amounts are rounded to the ban so the four always add up exactly to the month's total. On the front page, each apartment's part of each bill is rounded too:
 - the parts of a bill add up to the bill;
