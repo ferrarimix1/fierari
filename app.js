@@ -2459,18 +2459,18 @@ if (typeof document !== 'undefined' && document.getElementById('ff-data')) {
 /* ====================================================================== website layer
    The same app, served by GitHub Pages at fierari.avrusu.eu. This file comes after the app's
    own script and replaces its Claude-specific parts (boot, saving, footer).
-   - The months live in data.enc.json, encrypted with the viewing password: AES-GCM with a key
-     from PBKDF2-SHA256. The repository is public, so nothing is readable without the password.
-   - Reading needs only the password. Saving also needs a GitHub key with write access to the
-     repository; it is kept on the owner's own devices only (localStorage) and sent nowhere but
-     api.github.com. */
+   - The months live in data.json, in the open: anyone with the address sees the bills, with no
+     password (the owner's choice, 23 Nov 2026).
+   - Saving needs a GitHub key with write access to the repository; it is kept on the owner's own
+     devices only (localStorage) and sent nowhere but api.github.com. */
 
-var WEB = { repo: 'fierari', branch: 'main', path: 'data.enc.json', iter: 310000, api: 'https://api.github.com', minPass: 8 };
+var WEB = { repo: 'fierari', branch: 'main', path: 'data.json', api: 'https://api.github.com' };
 XLSX_URLS = ['vendor/xlsx.full.min.js'];
 
 Object.assign(I18N.ro, {
   editorsOnly: 'Doar administratorul vede acest buton.',
-  live: 'Cifrele sunt criptate; le vede doar cine are parola.',
+  live: 'O lună nouă apare aici la 1–2 minute după ce e salvată.',
+  secNote: 'Observații (opțional; le vede oricine deschide pagina)',
   savedT: '{m} a fost salvată. Pe site apare pentru toți în 1–2 minute.',
   deletedT: '{m} a fost ștearsă. Pe site se vede în 1–2 minute.',
   settingsT: 'Setările au fost salvate.',
@@ -2478,17 +2478,7 @@ Object.assign(I18N.ro, {
   unavailable: 'Ca să salvezi, conectează acest dispozitiv la Administrare.',
   loading: 'Se încarcă…',
   loadFail: 'Datele nu au putut fi încărcate. Verifică internetul și reîncarcă pagina.',
-  needHttps: 'Deschide pagina cu https:// (conexiune securizată); altfel datele nu pot fi descifrate.',
-  gateTitle: 'Pagina e protejată cu parolă',
-  gateText: 'Introdu parola primită de la proprietar.',
-  gatePass: 'Parola',
-  gateRemember: 'Ține minte pe acest dispozitiv',
-  gateOpen: 'Deschide',
-  gateChecking: 'Se verifică…',
-  gateWrong: 'Parola nu e corectă.',
-  gateChanged: 'Parola s-a schimbat. Introdu parola nouă.',
   webAdmin: 'Administrare',
-  webLock: 'Închide pe acest dispozitiv',
   webConflict: 'Între timp s-a salvat altceva. Am reîncărcat datele: verifică și salvează din nou.',
   webBadToken: 'Cheia GitHub nu mai e valabilă (a expirat sau a fost ștearsă). Pune una nouă la Administrare.',
   webNoAccess: 'Cheia GitHub nu are voie să scrie în depozitul „fierari”.',
@@ -2502,17 +2492,9 @@ Object.assign(I18N.ro, {
   adminNoRepo: 'Cheia nu are acces la depozitul „fierari” sau la fișierul cu date.',
   adminConnected: 'Acest dispozitiv e conectat ca {u}. Poți adăuga și modifica luni.',
   adminDisconnect: 'Deconectează acest dispozitiv',
-  adminPassTitle: 'Parola de acces',
-  adminPassText: 'Schimbă parola pe care o folosesc chiriașii. După schimbare, dă-le parola nouă.',
-  adminNewPass: 'Parola nouă',
-  adminNewPass2: 'Repetă parola nouă',
-  adminPassSave: 'Schimbă parola',
-  adminPassShort: 'Cel puțin {n} caractere.',
-  adminPassMismatch: 'Parolele nu coincid.',
-  adminPassDone: 'Parola a fost schimbată. Dă-le chiriașilor parola nouă.',
   webConnectedT: 'Conectat. Acum poți adăuga și modifica luni.',
   webDisconnectedT: 'Dispozitivul a fost deconectat.',
-  webKeyPass: 'Cheie și parolă',
+  webKey: 'Cheia GitHub',
   fEyebrow: 'De plată',
   fTotalsTitle: 'Totaluri pe categorii',
   fGazHow: '{b} × cota de suprafață a fiecărui apartament',
@@ -2537,7 +2519,8 @@ Object.assign(I18N.ro, {
 });
 Object.assign(I18N.en, {
   editorsOnly: 'Only the admin sees this button.',
-  live: 'The figures are encrypted; only people with the password can see them.',
+  live: 'A new month appears here 1–2 minutes after it is saved.',
+  secNote: 'Notes (optional; anyone who opens the page sees them)',
   savedT: '{m} saved. Everyone sees it on the site within 1–2 minutes.',
   deletedT: '{m} deleted. The site shows it within 1–2 minutes.',
   settingsT: 'Settings saved.',
@@ -2545,17 +2528,7 @@ Object.assign(I18N.en, {
   unavailable: 'To save, connect this device under Admin.',
   loading: 'Loading…',
   loadFail: 'The data could not be loaded. Check the internet connection and reload the page.',
-  needHttps: 'Open the page with https:// (a secure connection); otherwise the data cannot be decrypted.',
-  gateTitle: 'This page is password-protected',
-  gateText: 'Enter the password you got from the owner.',
-  gatePass: 'Password',
-  gateRemember: 'Remember on this device',
-  gateOpen: 'Open',
-  gateChecking: 'Checking…',
-  gateWrong: 'That password is not right.',
-  gateChanged: 'The password has changed. Enter the new one.',
   webAdmin: 'Admin',
-  webLock: 'Lock on this device',
   webConflict: 'Something else was saved meanwhile. The data has been reloaded: check it and save again.',
   webBadToken: 'The GitHub key no longer works (it expired or was deleted). Add a new one under Admin.',
   webNoAccess: 'The GitHub key may not write to the "fierari" repository.',
@@ -2569,17 +2542,9 @@ Object.assign(I18N.en, {
   adminNoRepo: 'The key has no access to the "fierari" repository or its data file.',
   adminConnected: 'This device is connected as {u}. You can add and change months.',
   adminDisconnect: 'Disconnect this device',
-  adminPassTitle: 'Access password',
-  adminPassText: 'Change the password the tenants use. Afterwards, give them the new one.',
-  adminNewPass: 'New password',
-  adminNewPass2: 'New password again',
-  adminPassSave: 'Change password',
-  adminPassShort: 'At least {n} characters.',
-  adminPassMismatch: 'The passwords do not match.',
-  adminPassDone: 'Password changed. Give the tenants the new one.',
   webConnectedT: 'Connected. You can now add and change months.',
   webDisconnectedT: 'This device was disconnected.',
-  webKeyPass: 'Key and password',
+  webKey: 'GitHub key',
   fEyebrow: 'To pay',
   fTotalsTitle: 'Totals by category',
   fGazHow: "{b} × each apartment's floor-area share",
@@ -2603,9 +2568,8 @@ Object.assign(I18N.en, {
   fAdminNote: 'Admin: months are added and changed here.'
 });
 ICONS.key = '<circle cx="7.5" cy="15.5" r="3.5"/><path d="m10 13 8-8"/><path d="m15 8 3 3"/><path d="m17 6 2 2"/>';
-ICONS.lock = '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>';
 
-/* ------------------------------------------------------------------ encryption */
+/* ------------------------------------------------------------------ text ⇄ base64 (the GitHub API sends files as base64) */
 
 function b64enc(bytes) {
   var s = '';
@@ -2616,30 +2580,6 @@ function b64dec(str) {
   var s = atob(String(str).replace(/\s+/g, '')), out = new Uint8Array(s.length);
   for (var k = 0; k < s.length; k++) out[k] = s.charCodeAt(k);
   return out;
-}
-function deriveKey(pass, salt, iter) {
-  return crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']).then(function (base) {
-    return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
-  });
-}
-/* The stored file: {v, kdf, iter, salt, iv, ct}; ct is the data as JSON, encrypted. */
-function encryptData(data, pass) {
-  var salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
-  var plain = new TextEncoder().encode(JSON.stringify(normalizeData(data)));
-  return deriveKey(pass, salt, WEB.iter).then(function (key) {
-    return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, plain);
-  }).then(function (ct) {
-    return { v: 1, kdf: 'PBKDF2-SHA256', iter: WEB.iter, salt: b64enc(salt), iv: b64enc(iv), ct: b64enc(new Uint8Array(ct)) };
-  });
-}
-/* Rejects when the password is wrong (AES-GCM checks the whole message). */
-function decryptData(env, pass) {
-  if (!env || env.v !== 1 || !env.salt || !env.iv || !env.ct) return Promise.reject(new Error('format'));
-  return deriveKey(pass, b64dec(env.salt), env.iter || WEB.iter).then(function (key) {
-    return crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64dec(env.iv) }, key, b64dec(env.ct));
-  }).then(function (buf) {
-    return normalizeData(JSON.parse(new TextDecoder().decode(buf)));
-  });
 }
 function utf8ToB64(s) { return b64enc(new TextEncoder().encode(s)); }
 function b64ToUtf8(s) { return new TextDecoder().decode(b64dec(s)); }
@@ -2661,18 +2601,17 @@ function ghFileUrl(owner) { return '/repos/' + owner + '/' + WEB.repo + '/conten
 /* The owner's copy comes from the GitHub API: always the latest, with the version (sha) a save needs. */
 function loadFromGitHub(token, owner) {
   return gh('GET', ghFileUrl(owner) + '?ref=' + WEB.branch, token).then(function (f) {
-    var env = JSON.parse(b64ToUtf8(f.content));
-    return { sha: f.sha, env: env };
+    return { sha: f.sha, data: normalizeData(JSON.parse(b64ToUtf8(f.content))) };
   });
 }
 
-function putEnvelope(env, message) {
+/* One commit of data.json, written one month per line so GitHub shows each change plainly. */
+function putData(nd, message) {
   var g = state.gh;
-  var body = { message: message, content: utf8ToB64(JSON.stringify(env) + '\n'), branch: WEB.branch };
+  var body = { message: message, content: utf8ToB64(serializeData(nd) + '\n'), branch: WEB.branch };
   if (g.sha) body.sha = g.sha;
   return gh('PUT', ghFileUrl(g.owner), g.token, body).then(function (r) {
     g.sha = r && r.content && r.content.sha;
-    state.env = env;
   });
 }
 
@@ -2692,6 +2631,9 @@ function boot() {
   toast.setAttribute('role', 'status');
   toast.setAttribute('aria-live', 'polite');
   document.body.appendChild(toast);
+  /* the page used to ask for a password; a device that remembered one no longer needs it */
+  lsDel('ff-pass');
+  ssDel('ff-pass');
   bindEvents();
   bindWebEvents();
   loadSite();
@@ -2704,79 +2646,22 @@ function bandHTML() {
     }).join('') + '</div></div></header>';
 }
 
-function fetchEnvelope() {
+/* The published data, fresh: the query string gets past any cached copy. */
+function fetchData() {
   return fetch(WEB.path + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) {
     if (!r.ok) throw new Error('http ' + r.status);
     return r.json();
+  }).then(function (j) {
+    var d = normalizeData(j);
+    if (!d.months.length) throw new Error('empty');
+    return d;
   });
 }
-
-function savedPass() { return lsGet('ff-pass') || ssGet('ff-pass'); }
-function forgetPass() { lsDel('ff-pass'); ssDel('ff-pass'); }
 
 function loadSite() {
-  state.gate = null;
-  if (!(window.crypto && crypto.subtle)) {
-    root.innerHTML = bandHTML() + '<div class="wrap"><p class="web-status bad">' + esc(tr('needHttps')) + '</p></div>';
-    return;
-  }
   root.innerHTML = bandHTML() + '<div class="wrap"><p class="web-status">' + esc(tr('loading')) + '</p></div>';
-  fetchEnvelope().then(function (env) {
-    state.env = env;
-    var pass = savedPass();
-    if (!pass) return showGate();
-    return decryptData(env, pass).then(function (d) { state.pass = pass; start(d); }, function () {
-      forgetPass();
-      showGate('gateChanged');
-    });
-  }, function () {
+  fetchData().then(start, function () {
     root.innerHTML = bandHTML() + '<div class="wrap"><p class="web-status bad">' + esc(tr('loadFail')) + '</p></div>';
-  });
-}
-
-/* ------------------------------------------------------------------ the password screen */
-
-function showGate(msg) {
-  state.data = null;
-  state.canEdit = false;
-  state.gate = { msg: msg || '', remember: true };
-  renderGate();
-  var f = $('g-pass');
-  if (f) f.focus();
-}
-
-function renderGate() {
-  var g = state.gate;
-  root.innerHTML = bandHTML() + '<div class="wrap"><form class="panel gate" id="gate-form" novalidate>' +
-    '<span class="gate-icon" aria-hidden="true">' + icon('lock') + '</span>' +
-    '<h2 class="h2">' + esc(tr('gateTitle')) + '</h2><p class="gate-text">' + esc(tr('gateText')) + '</p>' +
-    '<div class="field"><label for="g-pass">' + esc(tr('gatePass')) + '</label>' +
-    '<input type="password" id="g-pass" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" aria-describedby="g-msg"></div>' +
-    '<label class="check"><input type="checkbox" id="g-remember"' + (g.remember ? ' checked' : '') + '>' + esc(tr('gateRemember')) + '</label>' +
-    '<p class="msg bad" id="g-msg" role="alert">' + esc(g.msg ? tr(g.msg) : '') + '</p>' +
-    '<button type="submit" class="btn primary" id="g-open">' + esc(tr('gateOpen')) + '</button></form></div>';
-}
-
-function submitGate() {
-  var input = $('g-pass'), btn = $('g-open'), msg = $('g-msg');
-  if (!input || !state.env || btn.disabled) return;
-  var pass = input.value;
-  if (!pass) { input.focus(); return; }
-  var remember = !!($('g-remember') && $('g-remember').checked);
-  btn.disabled = true;
-  btn.textContent = tr('gateChecking');
-  decryptData(state.env, pass).then(function (d) {
-    if (remember) lsSet('ff-pass', pass);
-    else ssSet('ff-pass', pass);
-    state.pass = pass;
-    state.gate = null;
-    start(d);
-  }, function () {
-    btn.disabled = false;
-    btn.textContent = tr('gateOpen');
-    msg.textContent = tr('gateWrong');
-    input.setAttribute('aria-invalid', 'true');
-    input.select();
   });
 }
 
@@ -2800,20 +2685,18 @@ function connectOwner(token, fromDialog) {
   if (!token) return Promise.resolve(false);
   return gh('GET', '/user', token).then(function (u) {
     return loadFromGitHub(token, u.login).then(function (f) {
-      return decryptData(f.env, state.pass).then(function (d) {
-        state.gh = { token: token, owner: u.login, sha: f.sha };
-        state.env = f.env;
-        lsSet('ff-token', token);
-        if (JSON.stringify(d) !== JSON.stringify(state.data)) {
-          state.data = d;
-          state.comp = computeAll(d);
-          state.sel = d.months.length - 1;
-        }
-        state.webCanEdit = true;
-        state.canEdit = false;
-        updateEditability();
-        return true;
-      });
+      var d = f.data;
+      state.gh = { token: token, owner: u.login, sha: f.sha };
+      lsSet('ff-token', token);
+      if (JSON.stringify(d) !== JSON.stringify(state.data)) {
+        state.data = d;
+        state.comp = computeAll(d);
+        state.sel = d.months.length - 1;
+      }
+      state.webCanEdit = true;
+      state.canEdit = false;
+      updateEditability();
+      return true;
     });
   }).catch(function (e) {
     state.webCanEdit = false;
@@ -2847,9 +2730,7 @@ function saveData(nd, after) {
   nd.updated = todayISO();
   setSaving(true);
   setSheetMsg('', '');
-  return encryptData(nd, state.pass).then(function (env) {
-    return putEnvelope(env, commitMessage(after));
-  }).then(function () {
+  return putData(nd, commitMessage(after)).then(function () {
     lsDel('ff-draft');
     applyInPlace(nd, after);
   }, function (e) {
@@ -2870,16 +2751,14 @@ function refreshFromGitHub() {
   var g = state.gh;
   if (!g) return Promise.resolve();
   return loadFromGitHub(g.token, g.owner).then(function (f) {
-    return decryptData(f.env, state.pass).then(function (d) {
-      g.sha = f.sha;
-      state.env = f.env;
-      state.data = d;
-      state.comp = computeAll(d);
-      if (state.sel > d.months.length - 1) state.sel = d.months.length - 1;
-      if (state.sheet && state.sheet.mode === 'add') state.sheet.index = d.months.length;
-      renderAll();
-      setSheetMsg(tr('webConflict'), 'warn');
-    });
+    var d = f.data;
+    g.sha = f.sha;
+    state.data = d;
+    state.comp = computeAll(d);
+    if (state.sel > d.months.length - 1) state.sel = d.months.length - 1;
+    if (state.sheet && state.sheet.mode === 'add') state.sheet.index = d.months.length;
+    renderAll();
+    setSheetMsg(tr('webConflict'), 'warn');
   }).catch(function () { /* the message about the conflict stays */ });
 }
 
@@ -2904,12 +2783,11 @@ function renderFooter() {
   if (state.view === 'admin') {
     h += '<button type="button" class="btn sm" data-action="export"' + (state.exporting ? ' disabled' : '') + '>' + icon('down') + esc(state.exporting ? tr('exporting') : tr('exportXlsx')) + '</button>';
     if (state.canEdit) h += '<button type="button" class="btn sm" data-action="settings">' + icon('sliders') + esc(tr('settings')) + '</button>';
-    h += '<button type="button" class="btn sm" data-action="web-admin">' + icon('key') + esc(tr('webKeyPass')) + '</button>';
+    h += '<button type="button" class="btn sm" data-action="web-admin">' + icon('key') + esc(tr('webKey')) + '</button>';
   } else {
     /* the front page only shows; changes are made under Administrare */
     h += '<a class="btn sm ghost" href="#admin" data-route="admin">' + icon('key') + esc(tr('webAdmin')) + '</a>';
   }
-  h += '<button type="button" class="btn sm ghost" data-action="web-lock">' + icon('lock') + esc(tr('webLock')) + '</button>';
   el.innerHTML = h + '</div>';
 }
 
@@ -3198,12 +3076,6 @@ function renderAdmin() {
       '<div class="sheet-actions"><button type="submit" class="btn primary" id="adm-connect-btn">' + icon('key') + esc(tr('adminConnect')) + '</button></div></form>';
   } else {
     h += '<p class="okline">' + icon('check') + esc(tr('adminConnected', { u: g.owner })) + '</p>';
-    h += '<form id="adm-pass" novalidate><fieldset class="fs"><legend class="eyebrow">' + esc(tr('adminPassTitle')) + '</legend>' +
-      '<p class="hint">' + esc(tr('adminPassText')) + '</p><div class="fgrid">' +
-      '<div class="field"><label for="adm-p1">' + esc(tr('adminNewPass')) + '</label><input type="password" id="adm-p1" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>' +
-      '<div class="field"><label for="adm-p2">' + esc(tr('adminNewPass2')) + '</label><input type="password" id="adm-p2" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>' +
-      '</div><p class="msg" id="adm-pass-m" role="alert"></p>' +
-      '<div class="sheet-actions"><button type="submit" class="btn primary" id="adm-pass-btn">' + esc(tr('adminPassSave')) + '</button></div></fieldset></form>';
     h += '<div class="sheet-actions adm-foot"><button type="button" class="btn danger" data-adm="disconnect">' + esc(tr('adminDisconnect')) + '</button></div>';
   }
   dlg.innerHTML = h + '</div>';
@@ -3214,7 +3086,7 @@ function openAdmin() {
   renderAdmin();
   document.body.classList.add('locked');
   if (!dlg.open) dlg.showModal();
-  var f = $('adm-token') || $('adm-p1');
+  var f = $('adm-token');
   if (f) f.focus();
 }
 
@@ -3254,30 +3126,7 @@ function onAdminSubmit(ev) {
       msg.className = 'msg bad';
       msg.textContent = tr(e && e.code === 'badToken' ? 'adminBadToken' : e && e.code === 'offline' ? 'webOffline' : 'adminNoRepo');
     });
-  } else if (ev.target.id === 'adm-pass') changePassword();
-}
-
-function changePassword() {
-  var p1 = $('adm-p1').value, p2 = $('adm-p2').value, msg = $('adm-pass-m'), btn = $('adm-pass-btn');
-  msg.className = 'msg bad';
-  if (p1.length < WEB.minPass) { msg.textContent = tr('adminPassShort', { n: WEB.minPass }); $('adm-p1').focus(); return; }
-  if (p1 !== p2) { msg.textContent = tr('adminPassMismatch'); $('adm-p2').focus(); return; }
-  btn.disabled = true;
-  msg.textContent = '';
-  encryptData(state.data, p1).then(function (env) {
-    return putEnvelope(env, 'Parola de acces schimbată');
-  }).then(function () {
-    if (lsGet('ff-pass')) lsSet('ff-pass', p1);
-    else ssSet('ff-pass', p1);
-    state.pass = p1;
-    $('admin-dlg').close();
-    showToast(tr('adminPassDone'));
-  }, function (e) {
-    btn.disabled = false;
-    var code = e && e.code;
-    msg.textContent = tr(code === 'conflict' ? 'webConflict' : code === 'badToken' ? 'webBadToken' : code === 'noAccess' ? 'webNoAccess' : code === 'offline' ? 'webOffline' : 'saveFailed');
-    if (code === 'conflict') refreshFromGitHub();
-  });
+  }
 }
 
 /* ------------------------------------------------------------------ events */
@@ -3309,28 +3158,15 @@ function bindWebEvents() {
       lsSet('ff-lang', state.lang);
       document.documentElement.lang = state.lang;
       if (state.data) renderAll();
-      else if (state.gate) { var v = $('g-pass') ? $('g-pass').value : ''; renderGate(); $('g-pass').value = v; }
       else loadSite();
     } else if (act === 'web-admin') openAdmin();
-    else if (act === 'web-lock') {
-      forgetPass();
-      state.gh = null;
-      state.webCanEdit = false;
-      state.sheet = null;
-      document.body.classList.remove('locked');
-      state.pass = null;
-      showGate();
-    }
-  });
-  root.addEventListener('submit', function (ev) {
-    if (ev.target.id === 'gate-form') { ev.preventDefault(); submitGate(); }
   });
   /* the browser's back and forward buttons move between the front page and #admin */
   window.addEventListener('popstate', function () { setView(viewFromHash(), false); });
   window.addEventListener('hashchange', function () { setView(viewFromHash(), false); });
 }
 
-/* The front page by default, the full app under #admin. While the password screen is up there is
+/* The front page by default, the full app under #admin. Until the data has loaded there is
    nothing to draw (a link change would otherwise try). */
 var coreRenderAll = renderAll;
 renderAll = function () {
