@@ -2525,8 +2525,8 @@ Object.assign(I18N.ro, {
   citLink: 'Trimite citirile',
   citTitle: 'Citirile contoarelor',
   citIntro: 'Scrie indexul de pe fiecare contor. Citirile apar pe pagina principală în 1–2 minute și intră în calculul pentru {m}.',
-  citOff: 'Panoul de citiri nu e activat încă. Îl activează proprietarul, din Administrare.',
-  citPass: 'Parola panoului',
+  citOff: 'Panoul de citiri nu e pornit încă. Îl pornește proprietarul, din Administrare, alegând o parolă.',
+  citPass: 'Parola',
   citOpen: 'Deschide',
   citChecking: 'Se verifică…',
   citWrong: 'Parola nu e corectă.',
@@ -2543,20 +2543,31 @@ Object.assign(I18N.ro, {
   pendNote: 'Trimise pe {d}. Facturile lunii nu sunt adăugate încă; consumul e față de ultima citire.',
   pendLast: 'Ultima citire',
   pendNew: 'Citirea nouă',
-  panTitle: 'Panoul de citiri',
-  panOffText: 'Cu o parolă, cine o știe poate trimite citirile contoarelor din pagina „Trimite citirile”, fără cheie GitHub.',
-  panOnText: 'Panoul de citiri e activ. Aici îi poți schimba parola sau îl poți opri.',
-  panRisk: 'Parola deblochează o copie a cheii tale GitHub. Cineva priceput ar putea folosi cheia ca să schimbe orice în depozit, așa că dă parola doar cui ai încredere. Dacă îți faci o cheie nouă, activează panoul din nou.',
-  panPass: 'Parola panoului',
+  panTitle: 'Parola',
+  panOffText: 'Cu o parolă, Administrarea și pagina „Trimite citirile” se deschid pe orice dispozitiv doar cu ea, fără cheie GitHub.',
+  panOnText: 'Parola deschide Administrarea și pagina „Trimite citirile”. Aici o poți schimba sau opri.',
+  panRisk: 'Parola deblochează o copie a cheii tale GitHub, păstrată pe site. Cine o are poate schimba orice la care ajunge cheia, așa că dă parola doar cui ai încredere. Dacă îți faci o cheie nouă, folosește „Am o cheie GitHub nouă”.',
+  panPass: 'Parola',
   panPass2: 'Repetă parola',
-  panOn: 'Activează panoul',
+  panOn: 'Salvează parola',
   panChange: 'Schimbă parola',
-  panOffBtn: 'Dezactivează panoul',
+  panOffBtn: 'Oprește parola',
   panShort: 'Cel puțin {n} caractere.',
   panMismatch: 'Parolele nu coincid.',
-  panOnT: 'Panoul de citiri e activ. Pe celelalte dispozitive merge în 1–2 minute.',
-  panOffT: 'Panoul de citiri a fost dezactivat.',
-  panChecking: 'Se verifică panoul…'
+  panOnT: 'Parola a fost salvată. Pe celelalte dispozitive merge în 1–2 minute.',
+  panOffT: 'Parola a fost oprită: Administrarea merge doar cu cheia GitHub, iar panoul de citiri e închis.',
+  panChecking: 'Se verifică…',
+  webUnreachable: 'Nu se poate ajunge la GitHub (api.github.com): {d}. Poate o extensie a browserului (de ex. un blocker de reclame) sau rețeaua îl blochează. Încearcă din alt browser.',
+  adminPassIntro: 'Scrie parola ca să adaugi și să modifici luni.',
+  adminPassLbl: 'Parola',
+  adminOpen: 'Deschide',
+  adminWrongPass: 'Parola nu e corectă.',
+  adminNewKey: 'Am o cheie GitHub nouă',
+  adminUsePass: 'Am deja parola',
+  adminSetupIntro: 'Prima dată: lipește cheia GitHub și alege o parolă. De acum înainte, pe orice dispozitiv, parola e tot ce trebuie: pentru Administrare și pentru trimiterea citirilor.',
+  adminSetupBtn: 'Conectează și salvează parola',
+  adminPassSavedT: 'Gata. De acum, Administrarea și citirile se deschid doar cu parola.',
+  adminKeyExpired: 'Cheia păstrată cu parola nu mai e valabilă (a expirat sau a fost ștearsă). Apasă „Am o cheie GitHub nouă”.'
 });
 Object.assign(I18N.en, {
   editorsOnly: 'Only the admin sees this button.',
@@ -2613,8 +2624,8 @@ Object.assign(I18N.en, {
   citLink: 'Send readings',
   citTitle: 'Meter readings',
   citIntro: 'Type the reading on each meter. The readings show on the front page within 1–2 minutes and go into the calculation for {m}.',
-  citOff: 'The readings panel is not switched on yet. The owner switches it on under Admin.',
-  citPass: 'Panel password',
+  citOff: 'The readings panel is not on yet. The owner turns it on under Admin by choosing a password.',
+  citPass: 'Password',
   citOpen: 'Open',
   citChecking: 'Checking…',
   citWrong: 'That password is not right.',
@@ -2631,20 +2642,31 @@ Object.assign(I18N.en, {
   pendNote: "Sent on {d}. The month's bills are not added yet; the use is since the last reading.",
   pendLast: 'Last reading',
   pendNew: 'New reading',
-  panTitle: 'Readings panel',
-  panOffText: 'With a password, anyone who knows it can send the meter readings from the "Send readings" page, without a GitHub key.',
-  panOnText: 'The readings panel is on. Here you can change its password or switch it off.',
-  panRisk: 'The password unlocks a copy of your GitHub key. Someone skilled could use that key to change anything in the repository, so give the password only to people you trust. If you make a new key, switch the panel on again.',
-  panPass: 'Panel password',
+  panTitle: 'Password',
+  panOffText: 'With a password, Admin and the "Send readings" page open on any device with just that, without a GitHub key.',
+  panOnText: 'The password opens Admin and the "Send readings" page. Here you can change it or switch it off.',
+  panRisk: 'The password unlocks a copy of your GitHub key kept on the site. Whoever has it can change anything that key reaches, so give the password only to people you trust. If you make a new key, use "I have a new GitHub key".',
+  panPass: 'Password',
   panPass2: 'Password again',
-  panOn: 'Switch the panel on',
+  panOn: 'Save the password',
   panChange: 'Change password',
-  panOffBtn: 'Switch the panel off',
+  panOffBtn: 'Switch the password off',
   panShort: 'At least {n} characters.',
   panMismatch: 'The passwords do not match.',
-  panOnT: 'The readings panel is on. Other devices can use it within 1–2 minutes.',
-  panOffT: 'The readings panel was switched off.',
-  panChecking: 'Checking the panel…'
+  panOnT: 'Password saved. Other devices can use it within 1–2 minutes.',
+  panOffT: 'The password is off: Admin works only with the GitHub key, and the readings panel is closed.',
+  panChecking: 'Checking…',
+  webUnreachable: 'GitHub (api.github.com) cannot be reached: {d}. A browser extension (an ad blocker, say) or the network may be blocking it. Try another browser.',
+  adminPassIntro: 'Type the password to add and change months.',
+  adminPassLbl: 'Password',
+  adminOpen: 'Open',
+  adminWrongPass: 'That password is not right.',
+  adminNewKey: 'I have a new GitHub key',
+  adminUsePass: 'I already have the password',
+  adminSetupIntro: 'First time: paste the GitHub key and choose a password. From then on, on any device, the password is all you need: for Admin and for sending the readings.',
+  adminSetupBtn: 'Connect and save the password',
+  adminPassSavedT: 'Done. From now on, Admin and the readings open with just the password.',
+  adminKeyExpired: 'The key kept with the password no longer works (it expired or was deleted). Press "I have a new GitHub key".'
 });
 ICONS.key = '<circle cx="7.5" cy="15.5" r="3.5"/><path d="m10 13 8-8"/><path d="m15 8 3 3"/><path d="m17 6 2 2"/>';
 
@@ -2689,15 +2711,31 @@ function decryptJSON(env, pass) {
 
 /* ------------------------------------------------------------------ GitHub */
 
+/* Plain requests only: some browsers turn fetch's cache option into extra headers that GitHub's
+   CORS rules refuse, so freshness comes from a query string instead. */
 function gh(method, url, token, body) {
   var headers = { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Authorization': 'Bearer ' + token };
   if (body) headers['Content-Type'] = 'application/json';
-  return fetch(WEB.api + url, { method: method, headers: headers, body: body ? JSON.stringify(body) : undefined, cache: 'no-store', referrerPolicy: 'no-referrer' })
-    .then(function (r) {
-      if (r.ok) return r.json();
-      var code = r.status === 401 ? 'badToken' : r.status === 403 || r.status === 404 ? 'noAccess' : r.status === 409 || r.status === 422 ? 'conflict' : 'failed';
-      throw { code: code, status: r.status };
-    }, function () { throw { code: 'offline' }; });
+  if (method === 'GET') url += (url.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now();
+  var req;
+  try {
+    req = fetch(WEB.api + url, { method: method, headers: headers, body: body ? JSON.stringify(body) : undefined });
+  } catch (err) {
+    return Promise.reject({ code: 'unreachable', detail: String(err && err.message || err) });
+  }
+  return req.then(function (r) {
+    if (r.ok) return r.json();
+    var code = r.status === 401 ? 'badToken' : r.status === 403 || r.status === 404 ? 'noAccess' : r.status === 409 || r.status === 422 ? 'conflict' : 'failed';
+    throw { code: code, status: r.status };
+  }, function (err) {
+    throw { code: typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'unreachable', detail: String(err && err.message || err) };
+  });
+}
+
+/* A key as pasted: whatever surrounds it (spaces, "Bearer", invisible characters) is dropped. */
+function cleanToken(s) {
+  var m = /(github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9]+)/.exec(String(s || ''));
+  return m ? m[1] : String(s || '').replace(/[^A-Za-z0-9_]/g, '');
 }
 function ghFileUrl(owner) { return '/repos/' + owner + '/' + WEB.repo + '/contents/' + WEB.path; }
 
@@ -2745,7 +2783,9 @@ function ghFileJSON(f) {
 }
 function ghErrorText(e) {
   var code = e && e.code;
-  return tr(code === 'stale' ? 'webStale' : code === 'conflict' ? 'webConflict' : code === 'badToken' ? 'webBadToken' : code === 'noAccess' ? 'webNoAccess' : code === 'offline' ? 'webOffline' : 'saveFailed');
+  if (code === 'unreachable') return tr('webUnreachable', { d: e.detail || '?' });
+  return tr(code === 'stale' ? 'webStale' : code === 'conflict' ? 'webConflict' : code === 'badToken' ? 'webBadToken' : code === 'noAccess' ? 'webNoAccess' : code === 'offline' ? 'webOffline' : 'saveFailed') +
+    (code === 'failed' && e.status ? ' (GitHub: ' + e.status + ')' : '');
 }
 
 /* ------------------------------------------------------------------ boot */
@@ -2890,10 +2930,7 @@ function saveData(nd, after) {
       setSheetMsg(tr('webConflict'), 'warn');
       refreshFromGitHub();
     } else if (code === 'stale') setSheetMsg(tr('webStale'), 'warn');
-    else if (code === 'badToken') setSheetMsg(tr('webBadToken'), 'bad');
-    else if (code === 'noAccess') setSheetMsg(tr('webNoAccess'), 'bad');
-    else if (code === 'offline') setSheetMsg(tr('webOffline'), 'bad');
-    else setSheetMsg(tr('saveFailed'), 'bad');
+    else setSheetMsg(ghErrorText(e), 'bad');
   });
 }
 
@@ -3441,25 +3478,41 @@ function adminDialog() {
 }
 
 function renderAdmin() {
-  var dlg = adminDialog(), g = state.gh;
+  var dlg = adminDialog(), g = state.gh, info = state.cit.info;
   var h = '<div class="sheet-head"><h2 class="h2" id="adm-title">' + esc(tr('adminTitle')) + '</h2>' +
     '<button type="button" class="icon-btn" data-adm="close" aria-label="' + esc(tr('close')) + '">' + icon('x') + '</button></div><div class="sheet-body">';
-  if (!g) {
-    h += '<form id="adm-connect" novalidate><p class="hint">' + esc(tr('adminIntro')) + '</p>' +
-      '<div class="field"><label for="adm-token">' + esc(tr('adminToken')) + '</label>' +
-      '<input type="password" id="adm-token" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="adm-token-m">' +
-      '<small class="msg" id="adm-token-m" role="alert"></small></div>' +
-      '<div class="sheet-actions"><button type="submit" class="btn primary" id="adm-connect-btn">' + icon('key') + esc(tr('adminConnect')) + '</button></div></form>';
-  } else {
+  if (g) {
     h += '<p class="okline">' + icon('check') + esc(tr('adminConnected', { u: g.owner })) + '</p>';
     h += panelAdminHTML();
     h += '<div class="sheet-actions adm-foot"><button type="button" class="btn danger" data-adm="disconnect">' + esc(tr('adminDisconnect')) + '</button></div>';
+  } else if (info === undefined) {
+    h += '<p class="hint">' + esc(tr('panChecking')) + '</p>';
+  } else if (info && state.admMode !== 'setup') {
+    /* the usual way in: the password opens the key kept on the site */
+    h += '<form id="adm-pass-form" novalidate><p class="hint">' + esc(tr('adminPassIntro')) + '</p>' +
+      '<div class="field"><label for="adm-pass">' + esc(tr('adminPassLbl')) + '</label>' +
+      '<input type="password" id="adm-pass" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" aria-describedby="adm-pass-m">' +
+      '<small class="msg" id="adm-pass-m" role="alert"></small></div>' +
+      '<div class="sheet-actions"><button type="submit" class="btn primary" id="adm-pass-btn">' + icon('key') + esc(tr('adminOpen')) + '</button>' +
+      '<button type="button" class="btn ghost" data-adm="newkey">' + esc(tr('adminNewKey')) + '</button></div></form>';
+  } else {
+    /* the first time, or a new key: the key and the password that will lock it */
+    h += '<form id="adm-setup" novalidate><p class="hint">' + esc(tr('adminSetupIntro')) + '</p>' +
+      '<div class="field"><label for="adm-token">' + esc(tr('adminToken')) + '</label>' +
+      '<input type="password" id="adm-token" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="adm-token-m">' +
+      '<small class="msg" id="adm-token-m" role="alert"></small></div><div class="fgrid adm-pw">' +
+      '<div class="field"><label for="adm-p1">' + esc(tr('panPass')) + '</label><input type="password" id="adm-p1" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>' +
+      '<div class="field"><label for="adm-p2">' + esc(tr('panPass2')) + '</label><input type="password" id="adm-p2" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>' +
+      '</div><small class="msg" id="adm-setup-m" role="alert"></small><p class="hint pan-risk">' + esc(tr('panRisk')) + '</p>' +
+      '<div class="sheet-actions"><button type="submit" class="btn primary" id="adm-connect-btn">' + icon('key') + esc(tr('adminSetupBtn')) + '</button>' +
+      (info ? '<button type="button" class="btn ghost" data-adm="usepass">' + esc(tr('adminUsePass')) + '</button>' : '') + '</div></form>';
   }
   dlg.innerHTML = h + '</div>';
 }
 
-/* switching the readings panel on, changing its password, or off (panel.json is then just {}) */
+/* the password, once connected: change it, or switch it off (panel.json is then just {}) */
 state.panAdmin = { status: undefined };
+state.admMode = null;
 function panelAdminHTML() {
   var s = state.panAdmin.status, on = s === 'on';
   var h = '<section class="adm-sec" aria-labelledby="pan-title"><h3 class="h3" id="pan-title">' + esc(tr('panTitle')) + '</h3>';
@@ -3485,24 +3538,115 @@ function checkPanelStatus() {
   });
 }
 
+/* locks the connected key with a password and stores it on the site (panel.json) */
+function savePassword(p1) {
+  var g = state.gh;
+  return encryptJSON({ token: g.token, owner: g.owner }, p1).then(function (env) {
+    return ghWriteFile(g, WEB.panel, JSON.stringify(env) + '\n', 'Parola de acces salvată').then(function () {
+      state.cit.info = env;
+      state.cit.key = { token: g.token, owner: g.owner };
+      state.panAdmin.status = 'on';
+      lsSet('ff-cit', p1);
+    });
+  });
+}
+
+function passwordProblem(p1, p2) {
+  if (p1.length < WEB.minPanelPass) return { text: tr('panShort', { n: WEB.minPanelPass }), field: 1 };
+  if (p1 !== p2) return { text: tr('panMismatch'), field: 2 };
+  return null;
+}
+
+function connectErrorText(e) {
+  var code = e && e.code;
+  if (!code && typeof console !== 'undefined') console.error(e);
+  if (code === 'unreachable' || code === 'offline') return ghErrorText(e);
+  return code === 'badToken' ? tr('adminBadToken') : code === 'stale' ? tr('webStale') :
+    code === 'wrongAccount' ? tr('adminWrongAccount', { u: e.login || '?', o: WEB.owner }) :
+    tr('adminNoRepo') + (e && e.status ? ' (GitHub: ' + e.status + ')' : '');
+}
+
+/* the first time: check the key, then lock it with the chosen password */
+function setupWithKey() {
+  var input = $('adm-token'), btn = $('adm-connect-btn'), msg = $('adm-token-m'), pm = $('adm-setup-m');
+  var token = cleanToken(input.value), p1 = $('adm-p1').value, p2 = $('adm-p2').value;
+  msg.className = 'msg bad';
+  pm.className = 'msg bad';
+  msg.textContent = '';
+  pm.textContent = '';
+  if (!token) { input.focus(); return; }
+  var bad = passwordProblem(p1, p2);
+  if (bad) { pm.textContent = bad.text; $('adm-p' + bad.field).focus(); return; }
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = tr('adminChecking');
+  isCurrent().then(function (cur) {
+    if (!cur) throw { code: 'stale' };
+    return connectOwner(token, true);
+  }).then(function () {
+    return savePassword(p1).then(function () {
+      state.admMode = null;
+      $('admin-dlg').close();
+      showToast(tr('adminPassSavedT'));
+    }, function (e) {
+      /* connected, but the password could not be stored: say so where it can be tried again */
+      state.panAdmin.status = 'off';
+      renderAdmin();
+      var m = $('pan-m');
+      if (m) { m.className = 'msg bad'; m.textContent = ghErrorText(e); }
+    });
+  }, function (e) {
+    btn.disabled = false;
+    btn.innerHTML = icon('key') + esc(tr('adminSetupBtn'));
+    msg.textContent = connectErrorText(e);
+  });
+}
+
+/* the usual way: the password opens the key kept on the site */
+function openWithPassword() {
+  var input = $('adm-pass'), btn = $('adm-pass-btn'), msg = $('adm-pass-m'), pass = input.value;
+  if (!pass) { input.focus(); return; }
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = tr('adminChecking');
+  msg.className = 'msg bad';
+  msg.textContent = '';
+  decryptJSON(state.cit.info, pass).then(function (k) {
+    if (!k || !k.token) throw { code: 'wrongPass' };
+    return k;
+  }, function () { throw { code: 'wrongPass' }; }).then(function (k) {
+    return isCurrent().then(function (cur) {
+      if (!cur) throw { code: 'stale' };
+      return connectOwner(k.token, true);
+    }).then(function () {
+      state.cit.key = { token: k.token, owner: WEB.owner };
+      lsSet('ff-cit', pass);
+      state.panAdmin.status = 'on';
+      $('admin-dlg').close();
+      showToast(tr('webConnectedT'));
+    });
+  }).catch(function (e) {
+    btn.disabled = false;
+    btn.innerHTML = icon('key') + esc(tr('adminOpen'));
+    var code = e && e.code;
+    msg.textContent = code === 'wrongPass' ? tr('adminWrongPass') : code === 'badToken' ? tr('adminKeyExpired') : connectErrorText(e);
+    if (code === 'wrongPass') input.select();
+  });
+}
+
+/* connected: a new password for the key kept on the site */
 function activatePanel() {
-  var p1 = $('pan-p1').value, p2 = $('pan-p2').value, m = $('pan-m'), btn = $('pan-btn'), g = state.gh;
+  var p1 = $('pan-p1').value, p2 = $('pan-p2').value, m = $('pan-m'), btn = $('pan-btn');
   m.className = 'msg bad';
-  if (p1.length < WEB.minPanelPass) { m.textContent = tr('panShort', { n: WEB.minPanelPass }); $('pan-p1').focus(); return; }
-  if (p1 !== p2) { m.textContent = tr('panMismatch'); $('pan-p2').focus(); return; }
-  if (!g || btn.disabled) return;
+  var bad = passwordProblem(p1, p2);
+  if (bad) { m.textContent = bad.text; $('pan-p' + bad.field).focus(); return; }
+  if (!state.gh || btn.disabled) return;
   btn.disabled = true;
   m.textContent = '';
   isCurrent().then(function (cur) {
     if (!cur) throw { code: 'stale' };
-    return encryptJSON({ token: g.token, owner: g.owner }, p1);
-  }).then(function (env) {
-    return ghWriteFile(g, WEB.panel, JSON.stringify(env) + '\n', 'Panoul de citiri: parolă nouă').then(function () { return env; });
-  }).then(function (env) {
-    state.panAdmin.status = 'on';
-    state.cit.info = env;
-    state.cit.key = null;
-    lsDel('ff-cit');
+    return savePassword(p1);
+  }).then(function () {
     $('admin-dlg').close();
     showToast(tr('panOnT'));
   }, function (e) {
@@ -3514,7 +3658,7 @@ function activatePanel() {
 function deactivatePanel() {
   var g = state.gh;
   if (!g) return;
-  ghWriteFile(g, WEB.panel, '{}\n', 'Panoul de citiri dezactivat').then(function () {
+  ghWriteFile(g, WEB.panel, '{}\n', 'Parola de acces oprită').then(function () {
     state.panAdmin.status = 'off';
     state.cit.info = null;
     state.cit.key = null;
@@ -3527,14 +3671,20 @@ function deactivatePanel() {
   });
 }
 
+function focusAdmin() {
+  var f = $('adm-pass') || $('adm-token');
+  if (f) f.focus();
+}
+
 function openAdmin() {
   var dlg = adminDialog();
+  state.admMode = null;
   if (state.gh) { state.panAdmin.status = undefined; checkPanelStatus(); }
+  else if (state.cit.info === undefined) loadPanelInfo().then(function () { if (dlg.open && !state.gh) { renderAdmin(); focusAdmin(); } });
   renderAdmin();
   document.body.classList.add('locked');
   if (!dlg.open) dlg.showModal();
-  var f = $('adm-token');
-  if (f) f.focus();
+  focusAdmin();
 }
 
 function onAdminClick(ev) {
@@ -3545,10 +3695,13 @@ function onAdminClick(ev) {
   }
   var a = t.getAttribute('data-adm');
   if (a === 'close') $('admin-dlg').close();
+  else if (a === 'newkey' || a === 'usepass') { state.admMode = a === 'newkey' ? 'setup' : null; renderAdmin(); focusAdmin(); }
   else if (a === 'pan-off') deactivatePanel();
   else if (a === 'disconnect') {
     lsDel('ff-token');
+    lsDel('ff-cit');
     state.gh = null;
+    state.cit.key = null;
     state.webCanEdit = false;
     $('admin-dlg').close();
     updateEditability();
@@ -3558,33 +3711,10 @@ function onAdminClick(ev) {
 
 function onAdminSubmit(ev) {
   ev.preventDefault();
-  if (ev.target.id === 'adm-connect') {
-    var input = $('adm-token'), btn = $('adm-connect-btn'), msg = $('adm-token-m');
-    var token = input.value.trim();
-    if (!token) { input.focus(); return; }
-    btn.disabled = true;
-    btn.textContent = tr('adminChecking');
-    msg.textContent = '';
-    isCurrent().then(function (cur) {
-      if (!cur) throw { code: 'stale' };
-      return connectOwner(token, true);
-    }).then(function () {
-      /* stay open: the readings panel can be switched on right here */
-      showToast(tr('webConnectedT'));
-      state.panAdmin.status = undefined;
-      renderAdmin();
-      checkPanelStatus();
-    }, function (e) {
-      btn.disabled = false;
-      btn.innerHTML = icon('key') + esc(tr('adminConnect'));
-      msg.className = 'msg bad';
-      var code = e && e.code;
-      if (!code && typeof console !== 'undefined') console.error(e);
-      msg.textContent = code === 'badToken' ? tr('adminBadToken') : code === 'offline' ? tr('webOffline') : code === 'stale' ? tr('webStale') :
-        code === 'wrongAccount' ? tr('adminWrongAccount', { u: e.login || '?', o: WEB.owner }) :
-        tr('adminNoRepo') + (e && e.status ? ' (GitHub: ' + e.status + ')' : '');
-    });
-  } else if (ev.target.id === 'pan-form') activatePanel();
+  var id = ev.target.id;
+  if (id === 'adm-setup') setupWithKey();
+  else if (id === 'adm-pass-form') openWithPassword();
+  else if (id === 'pan-form') activatePanel();
 }
 
 /* ------------------------------------------------------------------ events */
