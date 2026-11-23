@@ -41,7 +41,10 @@ Optional: under GitHub → Settings → Pages, *verify* `avrusu.eu`, so nobody e
 
 ## Day to day
 
-- **Adding a month:** go to Administrare and press "Adaugă …". DIGI (98) and rubbish (22 per apartment) are filled in. Type gas, water, each electricity bill (total and kWh), the meter readings and the people. Afterwards, "Facturile de plată" at the top goes back to the front page.
+- **Adding a month:** go to Administrare and press "Adaugă …". DIGI (98) and rubbish (22 per apartment) are filled in, and so are the meter readings if they were sent through "Trimite citirile". Type gas, water and the people.
+  - Electricity: type each bill that month (total and kWh).
+  - With no electricity bill that month, leave those rows empty: the kWh are paid at the latest price. To start with, that is November 2026's: 1,283.52 lei ÷ 1,156 kWh = 1.1103 lei/kWh.
+  - Afterwards, "Facturile de plată" at the top goes back to the front page.
 - **Tenants:** send them the address. They can add the page to the home screen (Share → Add to Home Screen).
 - **Key expired or a phone lost:** delete the key on GitHub (Settings → Developer settings → tokens), make a new one, and use "Am o cheie GitHub nouă" under Administrare. "Cheia GitHub" → "Deconectează acest dispozitiv" makes a device forget the key and the password.
 
