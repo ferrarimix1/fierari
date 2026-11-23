@@ -9,6 +9,7 @@ The house's utility bills, split between the four apartments. It is a single web
 
   The arrows next to the month go to earlier months. Nothing can be changed there.
 - **Changes are made under Administrare** (the link at the bottom, or https://fierari.avrusu.eu/#admin). That is the full app: adding and editing months, the history chart, the Excel download and the settings.
+- **Meter readings with a password:** "Trimite citirile" at the bottom (https://fierari.avrusu.eu/#citiri). Whoever has the panel password can type the five meter readings. They show on the front page as new readings, with the use so far. The owner's form for the next month starts from them.
 - **Only the owner can change anything.** A device can add or edit months once it is connected with a GitHub key that may write to this repository. The key stays on that device. Each save is one commit to `data.json`, and the site shows it to everyone within 1–2 minutes.
 - **The figures are public.** `data.json` holds the months in plain text, in this public repository and on the site. Search engines are asked not to index the site, but anyone with the address can read it. Keep names and other personal details out of the notes.
 
@@ -30,6 +31,10 @@ The house's utility bills, split between the four apartments. It is a single web
 
    Copy the key; GitHub shows it only once.
 6. **Connect your device.** Open https://fierari.avrusu.eu and press **Administrare** at the bottom; the page asks for the key. Paste it, then press **Conectează**. Repeat this on each device you want to add months from.
+7. **The readings panel (optional).** In the same dialog (Administrare → Cheia GitHub), under **Panoul de citiri**, type the panel password twice and press **Activează panoul**. This stores a copy of your key in `panel.json`, encrypted with that password, so the panel can save readings without your key on that device.
+   - Anyone who has the panel password could, with some skill, use that key to change anything in this repository. Give the password only to people you trust.
+   - If you make a new GitHub key, switch the panel on again.
+   - **Dezactivează panoul** empties `panel.json`.
 
 Optional: under GitHub → Settings → Pages, *verify* `avrusu.eu`, so nobody else can ever attach your domain to their own GitHub site.
 
@@ -57,6 +62,8 @@ Amounts are rounded to the ban so the four always add up exactly to the month's 
 |---|---|
 | `index.html`, `app.js`, `style.css` | The page |
 | `data.json` | The months. Changed by the page itself when you save |
+| `citiri.json` | The latest readings sent through the panel (`{}` when none) |
+| `panel.json` | The panel's copy of the key, encrypted with the panel password (`{}` when the panel is off) |
 | `fonts/`, `fonts.css` | Archivo, Inter, IBM Plex Mono (SIL Open Font License), served from here: no Google requests |
 | `vendor/xlsx.full.min.js` | SheetJS (Apache-2.0), loaded only for the Excel download |
 | `manifest.webmanifest`, `icon-*.png` | Lets phones install the page like an app |

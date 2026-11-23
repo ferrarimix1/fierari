@@ -2462,9 +2462,12 @@ if (typeof document !== 'undefined' && document.getElementById('ff-data')) {
    - The months live in data.json, in the open: anyone with the address sees the bills, with no
      password (the owner's choice, 23 Nov 2026).
    - Saving needs a GitHub key with write access to the repository; it is kept on the owner's own
-     devices only (localStorage) and sent nowhere but api.github.com. */
+     devices only (localStorage) and sent nowhere but api.github.com.
+   - The readings panel (#citiri): whoever has its password can send the five meter readings
+     (citiri.json). The owner switches it on under Administrare, which stores a copy of the
+     owner's key in panel.json, encrypted with the panel password (AES-GCM, PBKDF2-SHA256). */
 
-var WEB = { repo: 'fierari', branch: 'main', path: 'data.json', api: 'https://api.github.com' };
+var WEB = { repo: 'fierari', branch: 'main', path: 'data.json', pending: 'citiri.json', panel: 'panel.json', iter: 310000, minPanelPass: 10, api: 'https://api.github.com' };
 XLSX_URLS = ['vendor/xlsx.full.min.js'];
 
 Object.assign(I18N.ro, {
@@ -2515,7 +2518,42 @@ Object.assign(I18N.ro, {
   fEmptyTitle: 'Încă nu sunt facturi de plată',
   fEmptyText: 'Prima lună de plată, {m}, apare aici după ce se adaugă facturile ei.',
   fBack: 'Facturile de plată',
-  fAdminNote: 'Administrare: aici se adaugă și se modifică lunile.'
+  fAdminNote: 'Administrare: aici se adaugă și se modifică lunile.',
+  citLink: 'Trimite citirile',
+  citTitle: 'Citirile contoarelor',
+  citIntro: 'Scrie indexul de pe fiecare contor. Citirile apar pe pagina principală în 1–2 minute și intră în calculul pentru {m}.',
+  citOff: 'Panoul de citiri nu e activat încă. Îl activează proprietarul, din Administrare.',
+  citPass: 'Parola panoului',
+  citOpen: 'Deschide',
+  citChecking: 'Se verifică…',
+  citWrong: 'Parola nu e corectă.',
+  citRemember: 'Ține minte pe acest dispozitiv',
+  citSave: 'Trimite citirile',
+  citSaving: 'Se trimite…',
+  citDone: 'Citirile au fost trimise. Apar pe pagina principală în 1–2 minute.',
+  citLower: 'E mai mică decât ultima citire ({v}). Verifică; dacă s-a schimbat contorul, anunță proprietarul.',
+  citExpired: 'Panoul nu mai poate salva: cheia lui nu mai e valabilă. Anunță proprietarul să activeze panoul din nou.',
+  citFix: 'Corectează citirile marcate.',
+  citLock: 'Închide panoul pe acest dispozitiv',
+  citSent: 'Ultimele citiri au fost trimise pe {d}. Le poți corecta trimițându-le din nou.',
+  pendTitle: 'Citiri noi pentru {m}',
+  pendNote: 'Trimise pe {d}. Facturile lunii nu sunt adăugate încă; consumul e față de ultima citire.',
+  pendLast: 'Ultima citire',
+  pendNew: 'Citirea nouă',
+  panTitle: 'Panoul de citiri',
+  panOffText: 'Cu o parolă, cine o știe poate trimite citirile contoarelor din pagina „Trimite citirile”, fără cheie GitHub.',
+  panOnText: 'Panoul de citiri e activ. Aici îi poți schimba parola sau îl poți opri.',
+  panRisk: 'Parola deblochează o copie a cheii tale GitHub. Cineva priceput ar putea folosi cheia ca să schimbe orice în depozit, așa că dă parola doar cui ai încredere. Dacă îți faci o cheie nouă, activează panoul din nou.',
+  panPass: 'Parola panoului',
+  panPass2: 'Repetă parola',
+  panOn: 'Activează panoul',
+  panChange: 'Schimbă parola',
+  panOffBtn: 'Dezactivează panoul',
+  panShort: 'Cel puțin {n} caractere.',
+  panMismatch: 'Parolele nu coincid.',
+  panOnT: 'Panoul de citiri e activ. Pe celelalte dispozitive merge în 1–2 minute.',
+  panOffT: 'Panoul de citiri a fost dezactivat.',
+  panChecking: 'Se verifică panoul…'
 });
 Object.assign(I18N.en, {
   editorsOnly: 'Only the admin sees this button.',
@@ -2565,7 +2603,42 @@ Object.assign(I18N.en, {
   fEmptyTitle: 'No bills to pay yet',
   fEmptyText: 'The first month to pay, {m}, shows here once its bills are added.',
   fBack: 'Bills to pay',
-  fAdminNote: 'Admin: months are added and changed here.'
+  fAdminNote: 'Admin: months are added and changed here.',
+  citLink: 'Send readings',
+  citTitle: 'Meter readings',
+  citIntro: 'Type the reading on each meter. The readings show on the front page within 1–2 minutes and go into the calculation for {m}.',
+  citOff: 'The readings panel is not switched on yet. The owner switches it on under Admin.',
+  citPass: 'Panel password',
+  citOpen: 'Open',
+  citChecking: 'Checking…',
+  citWrong: 'That password is not right.',
+  citRemember: 'Remember on this device',
+  citSave: 'Send readings',
+  citSaving: 'Sending…',
+  citDone: 'Readings sent. They show on the front page within 1–2 minutes.',
+  citLower: 'Lower than the last reading ({v}). Check it; if the meter was replaced, tell the owner.',
+  citExpired: 'The panel can no longer save: its key no longer works. Ask the owner to switch the panel on again.',
+  citFix: 'Correct the marked readings.',
+  citLock: 'Close the panel on this device',
+  citSent: 'The last readings were sent on {d}. You can correct them by sending them again.',
+  pendTitle: 'New readings for {m}',
+  pendNote: "Sent on {d}. The month's bills are not added yet; the use is since the last reading.",
+  pendLast: 'Last reading',
+  pendNew: 'New reading',
+  panTitle: 'Readings panel',
+  panOffText: 'With a password, anyone who knows it can send the meter readings from the "Send readings" page, without a GitHub key.',
+  panOnText: 'The readings panel is on. Here you can change its password or switch it off.',
+  panRisk: 'The password unlocks a copy of your GitHub key. Someone skilled could use that key to change anything in the repository, so give the password only to people you trust. If you make a new key, switch the panel on again.',
+  panPass: 'Panel password',
+  panPass2: 'Password again',
+  panOn: 'Switch the panel on',
+  panChange: 'Change password',
+  panOffBtn: 'Switch the panel off',
+  panShort: 'At least {n} characters.',
+  panMismatch: 'The passwords do not match.',
+  panOnT: 'The readings panel is on. Other devices can use it within 1–2 minutes.',
+  panOffT: 'The readings panel was switched off.',
+  panChecking: 'Checking the panel…'
 });
 ICONS.key = '<circle cx="7.5" cy="15.5" r="3.5"/><path d="m10 13 8-8"/><path d="m15 8 3 3"/><path d="m17 6 2 2"/>';
 
@@ -2583,6 +2656,30 @@ function b64dec(str) {
 }
 function utf8ToB64(s) { return b64enc(new TextEncoder().encode(s)); }
 function b64ToUtf8(s) { return new TextDecoder().decode(b64dec(s)); }
+
+/* ------------------------------------------------------------------ encryption (the readings panel's copy of the key) */
+
+function deriveKey(pass, salt, iter) {
+  return crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']).then(function (base) {
+    return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  });
+}
+/* {v, kdf, iter, salt, iv, ct}: ct is the object as JSON, encrypted with a key from the password. */
+function encryptJSON(obj, pass) {
+  var salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  return deriveKey(pass, salt, WEB.iter).then(function (key) {
+    return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(JSON.stringify(obj)));
+  }).then(function (ct) {
+    return { v: 1, kdf: 'PBKDF2-SHA256', iter: WEB.iter, salt: b64enc(salt), iv: b64enc(iv), ct: b64enc(new Uint8Array(ct)) };
+  });
+}
+/* Rejects when the password is wrong (AES-GCM checks the whole message). */
+function decryptJSON(env, pass) {
+  if (!env || env.v !== 1 || !env.salt || !env.iv || !env.ct) return Promise.reject(new Error('format'));
+  return deriveKey(pass, b64dec(env.salt), env.iter || WEB.iter).then(function (key) {
+    return crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64dec(env.iv) }, key, b64dec(env.ct));
+  }).then(function (buf) { return JSON.parse(new TextDecoder().decode(buf)); });
+}
 
 /* ------------------------------------------------------------------ GitHub */
 
@@ -2613,6 +2710,36 @@ function putData(nd, message) {
   return gh('PUT', ghFileUrl(g.owner), g.token, body).then(function (r) {
     g.sha = r && r.content && r.content.sha;
   });
+}
+
+/* Other files in the repository (the readings, the panel's key), with key = {token, owner}. */
+function ghPath(key, path) { return '/repos/' + key.owner + '/' + WEB.repo + '/contents/' + path; }
+function ghGetFile(key, path) {
+  return gh('GET', ghPath(key, path) + '?ref=' + WEB.branch, key.token).catch(function (e) {
+    if (e && e.status === 404) return null;
+    throw e;
+  });
+}
+/* creates or replaces a file; tries once more if someone else wrote it in between */
+function ghWriteFile(key, path, text, message) {
+  function attempt(n) {
+    return ghGetFile(key, path).then(function (f) {
+      var body = { message: message, content: utf8ToB64(text), branch: WEB.branch };
+      if (f && f.sha) body.sha = f.sha;
+      return gh('PUT', ghPath(key, path), key.token, body);
+    }).catch(function (e) {
+      if (e && e.code === 'conflict' && n < 1) return attempt(n + 1);
+      throw e;
+    });
+  }
+  return attempt(0);
+}
+function ghFileJSON(f) {
+  try { return f && f.content ? JSON.parse(b64ToUtf8(f.content)) : null; } catch (e) { return null; }
+}
+function ghErrorText(e) {
+  var code = e && e.code;
+  return tr(code === 'conflict' ? 'webConflict' : code === 'badToken' ? 'webBadToken' : code === 'noAccess' ? 'webNoAccess' : code === 'offline' ? 'webOffline' : 'saveFailed');
 }
 
 /* ------------------------------------------------------------------ boot */
@@ -2658,9 +2785,19 @@ function fetchData() {
   });
 }
 
+/* a file that may not exist (the readings, the panel's key): null when it is missing */
+function fetchOptional(path) {
+  return fetch(path + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) {
+    return r.ok ? r.json() : null;
+  }).catch(function () { return null; });
+}
+
 function loadSite() {
   root.innerHTML = bandHTML() + '<div class="wrap"><p class="web-status">' + esc(tr('loading')) + '</p></div>';
-  fetchData().then(start, function () {
+  Promise.all([fetchData(), fetchOptional(WEB.pending)]).then(function (res) {
+    state.pendingRaw = res[1];
+    start(res[0]);
+  }, function () {
     root.innerHTML = bandHTML() + '<div class="wrap"><p class="web-status bad">' + esc(tr('loadFail')) + '</p></div>';
   });
 }
@@ -2675,6 +2812,7 @@ function start(d) {
   renderAll();
   connectOwner(lsGet('ff-token'), false);
   if (state.view === 'admin' && !lsGet('ff-token')) openAdmin();
+  if (state.view === 'panel') loadPanelInfo();
 }
 
 /* ------------------------------------------------------------------ owner */
@@ -2785,7 +2923,8 @@ function renderFooter() {
     if (state.canEdit) h += '<button type="button" class="btn sm" data-action="settings">' + icon('sliders') + esc(tr('settings')) + '</button>';
     h += '<button type="button" class="btn sm" data-action="web-admin">' + icon('key') + esc(tr('webKey')) + '</button>';
   } else {
-    /* the front page only shows; changes are made under Administrare */
+    /* the front page only shows; readings go through the panel, everything else under Administrare */
+    if (state.view !== 'panel') h += '<a class="btn sm ghost" href="#citiri" data-route="panel">' + icon('edit') + esc(tr('citLink')) + '</a>';
     h += '<a class="btn sm ghost" href="#admin" data-route="admin">' + icon('key') + esc(tr('webAdmin')) + '</a>';
   }
   el.innerHTML = h + '</div>';
@@ -2797,15 +2936,17 @@ function renderFooter() {
    part of every bill, the total of each bill, and how each one was split, with the month's own
    numbers. The full app, where the owner adds and changes months, is at #admin. */
 
-function viewFromHash() { return location.hash === '#admin' ? 'admin' : 'front'; }
+var VIEW_HASH = { admin: '#admin', panel: '#citiri' };
+function viewFromHash() { return location.hash === '#admin' ? 'admin' : location.hash === '#citiri' ? 'panel' : 'front'; }
 
 function setView(v, push) {
   if (v === state.view) return;
   state.view = v;
   if (push) {
-    try { history.pushState(null, '', v === 'admin' ? '#admin' : location.pathname + location.search); } catch (e) { location.hash = v === 'admin' ? 'admin' : ''; }
+    try { history.pushState(null, '', VIEW_HASH[v] || location.pathname + location.search); } catch (e) { location.hash = VIEW_HASH[v] || ''; }
   }
-  if (v === 'front') {
+  if (v === 'panel') loadPanelInfo();
+  if (v !== 'admin') {
     state.sheet = null;
     state.fsel = null;
     document.body.classList.remove('locked');
@@ -2932,8 +3073,48 @@ function frontEmptyHTML() {
     '<h2 class="mtitle f-empty-title" id="f-title">' + esc(tr('fEmptyTitle')) + '</h2>' +
     '<p class="stmt-lead">' + esc(tr('fEmptyText', { m: mName(n) })) + '</p>';
   if (last && last.start) h += metersHTML(n - 1);
-  return h + '</section><section class="panel" id="rules-panel" aria-labelledby="rules-title"></section>';
+  return h + '</section>' + pendingHTML() + '<section class="panel" id="rules-panel" aria-labelledby="rules-title"></section>';
 }
+
+/* ------------------------------------------------------------------ readings sent through the panel
+
+   citiri.json = {t: "YYYY-MM-DD", r: [five readings]}. They count as new readings for the next month
+   until a month uses them: none may be below the latest month's readings and one must be above. */
+function pendingReadings() {
+  var p = state.pendingRaw, ms = state.data && state.data.months;
+  if (!p || !Array.isArray(p.r) || p.r.length !== METERS.length || !ms || !ms.length) return null;
+  var last = ms[ms.length - 1].r, r = p.r.map(Number);
+  if (!r.every(num) || r.some(function (v, j) { return v < last[j]; }) || r.every(function (v, j) { return v === last[j]; })) return null;
+  return { r: r, t: typeof p.t === 'string' ? p.t : '', last: last };
+}
+
+function fmtDay(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return '—';
+  return new Intl.DateTimeFormat(I18N[state.lang].locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T00:00:00Z'));
+}
+
+/* on the front page: the new readings and the use since the last ones, before the bills come */
+function pendingHTML() {
+  var p = pendingReadings();
+  if (!p) return '';
+  var h = '<section class="panel" id="f-pending" aria-labelledby="f-pend-title"><h2 class="h2" id="f-pend-title">' + esc(tr('pendTitle', { m: mName(state.data.months.length) })) + '</h2>' +
+    '<p class="hint">' + esc(tr('pendNote', { d: fmtDay(p.t) })) + '</p><div class="scroll"><table class="tbl meters"><thead><tr><th scope="col">' + esc(tr('meter')) + '</th>' +
+    '<th scope="col">' + esc(tr('pendLast')) + '</th><th scope="col">' + esc(tr('pendNew')) + '</th><th scope="col" class="num">' + esc(tr('usage')) + '</th></tr></thead><tbody>';
+  METERS.forEach(function (j) {
+    var key = j < 4 ? '<span class="key a' + j + '" aria-hidden="true"></span> ' : '';
+    h += '<tr><th scope="row">' + key + esc(meterName(j)) + '</th><td><span class="drum">' + esc(drum(p.last[j])) + '</span></td><td><span class="drum">' + esc(drum(p.r[j])) + '</span></td>' +
+      '<td class="num">' + esc(kwhStr(p.r[j] - p.last[j])) + ' kWh</td></tr>';
+  });
+  return h + '</tbody></table></div></section>';
+}
+
+/* the owner's form for the next month starts from the readings sent through the panel */
+var coreDraftForAdd = draftForAdd;
+draftForAdd = function () {
+  var d = coreDraftForAdd(), p = pendingReadings();
+  if (p) d.r = p.r.map(numToInput);
+  return d;
+};
 
 function frontNavBtn(act, enabled, label, ic) {
   return '<button type="button" class="nav-btn" data-action="' + act + '" aria-label="' + esc(tr(label)) + '"' + (enabled ? '' : ' disabled') + '>' + icon(ic) + '</button>';
@@ -2961,7 +3142,7 @@ function frontMonthHTML(i, paid) {
   h += '</div></div>';
   if (c.manual) h += '<p class="noteline">' + esc(tr('manualNote', { v: lei(c.billTotal) })) + '</p>';
   if (m.note) h += '<p class="note"><b>' + esc(tr('note')) + ':</b> ' + esc(m.note) + '</p>';
-  h += '</section>';
+  h += '</section>' + pendingHTML();
   if (t.rows.length) h += frontTotalsHTML(i, t) + frontHowHTML(i, t);
   return h;
 }
@@ -3047,6 +3228,150 @@ function adminBarHTML() {
     icon('prev') + esc(tr('fBack')) + '</a><span class="muted">' + esc(tr('fAdminNote')) + '</span></nav>';
 }
 
+/* ------------------------------------------------------------------ the readings panel (#citiri)
+
+   With the panel password, anyone can send the five meter readings for the next month. The
+   password decrypts panel.json, the copy of the owner's key the owner stored when switching the
+   panel on; with it the page commits citiri.json and nothing else. */
+
+state.cit = { info: undefined, key: null, draft: ['', '', '', '', ''], touched: {}, passMsg: '', saving: false };
+
+/* whether the panel is switched on (panel.json exists); a remembered password opens it at once */
+function loadPanelInfo() {
+  var c = state.cit;
+  return fetchOptional(WEB.panel).then(function (env) {
+    c.info = env && env.v === 1 && env.ct ? env : null;
+    var saved = lsGet('ff-cit');
+    if (c.info && saved && !c.key) return unlockPanel(saved, true, true);
+  }).then(function () { if (state.view === 'panel') renderAll(); });
+}
+
+function unlockPanel(pass, remember, silent) {
+  var c = state.cit;
+  return decryptJSON(c.info, pass).then(function (k) {
+    if (!k || !k.token || !k.owner) throw new Error('format');
+    c.key = { token: k.token, owner: k.owner };
+    if (remember) lsSet('ff-cit', pass);
+    c.passMsg = '';
+    var p = pendingReadings();
+    c.draft = METERS.map(function (j) { return p ? numToInput(p.r[j]) : ''; });
+    c.touched = {};
+  }, function () {
+    if (silent) { lsDel('ff-cit'); return; }
+    c.passMsg = tr('citWrong');
+  });
+}
+
+function renderPanel() {
+  var c = state.cit, n = state.data.months.length;
+  var h = bandHTML() + '<main class="wrap front"><nav class="adminbar"><a class="btn sm" href="' + esc(location.pathname + location.search) + '" data-route="front">' +
+    icon('prev') + esc(tr('fBack')) + '</a></nav><section class="panel cit" aria-labelledby="c-title"><h2 class="h2" id="c-title">' + esc(tr('citTitle')) + '</h2>';
+  if (c.info === undefined) h += '<p class="hint">' + esc(tr('panChecking')) + '</p>';
+  else if (!c.info) h += '<p class="basenote cit-off">' + esc(tr('citOff')) + '</p>';
+  else if (!c.key) {
+    h += '<form id="cit-unlock" class="cit-unlock" novalidate><div class="field"><label for="c-pass">' + esc(tr('citPass')) + '</label>' +
+      '<input type="password" id="c-pass" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" aria-describedby="c-pass-m"' + (c.passMsg ? ' aria-invalid="true"' : '') + '></div>' +
+      '<label class="check"><input type="checkbox" id="c-remember">' + esc(tr('citRemember')) + '</label>' +
+      '<p class="msg bad" id="c-pass-m" role="alert">' + esc(c.passMsg) + '</p>' +
+      '<div class="sheet-actions"><button type="submit" class="btn primary" id="c-open">' + esc(tr('citOpen')) + '</button></div></form>';
+  } else {
+    var p = pendingReadings();
+    h += '<p class="stmt-lead">' + esc(tr('citIntro', { m: mName(n) })) + '</p>' + (p ? '<p class="hint">' + esc(tr('citSent', { d: fmtDay(p.t) })) + '</p>' : '') +
+      '<form id="cit-form" novalidate><div class="fgrid five">';
+    METERS.forEach(function (j) {
+      var id = 'c-r' + j;
+      h += '<div class="field"><label for="' + id + '">' + (j < 4 ? '<span class="key a' + j + '" aria-hidden="true"></span>' : '') + esc(meterName(j)) + '</label>' +
+        '<input type="text" id="' + id + '" data-cit="' + j + '" inputmode="decimal" autocomplete="off" spellcheck="false" enterkeyhint="next" value="' + esc(c.draft[j]) + '" aria-describedby="' + id + '-i ' + id + '-m">' +
+        '<small class="info" id="' + id + '-i"></small><small class="msg" id="' + id + '-m"></small></div>';
+    });
+    h += '</div><p class="sheet-msg" id="c-msg" role="status"></p><div class="sheet-actions"><button type="submit" class="btn primary" id="c-save">' + icon('check') + esc(tr('citSave')) + '</button>' +
+      '<button type="button" class="btn ghost" data-action="cit-lock">' + esc(tr('citLock')) + '</button></div></form>';
+  }
+  root.innerHTML = h + '</section><footer class="foot" id="foot"></footer></main>';
+  renderFooter();
+  if (c.key) refreshCit(false);
+  var f = $('c-pass');
+  if (f && c.passMsg) f.focus();
+}
+
+/* the readings as typed: each must be a number, not below the last reading, and not absurdly far above */
+function citCheck(draft) {
+  var last = state.data.months[state.data.months.length - 1].r, out = { r: [], errors: {}, ok: true };
+  METERS.forEach(function (j) {
+    var p = parseExpr(draft[j], 'plain'), e = null;
+    if (p.empty) e = 'eRequired';
+    else if (p.error) e = p.error === 'plain' ? 'ePlain' : p.error === 'thousands' ? 'eThousands' : 'eNumber';
+    else if (p.value < 0) e = 'eNegative';
+    else if (p.value < last[j]) e = 'lower';
+    else if (p.value - last[j] > LIMIT_KWH) e = 'eKwhBig';
+    out.r[j] = p.value;
+    if (e) { out.errors[j] = e; out.ok = false; }
+  });
+  return out;
+}
+
+function refreshCit(all) {
+  var c = state.cit, last = state.data.months[state.data.months.length - 1].r, chk = citCheck(c.draft);
+  METERS.forEach(function (j) {
+    var inp = $('c-r' + j), m = $('c-r' + j + '-m'), info = $('c-r' + j + '-i');
+    if (!inp) return;
+    var e = chk.errors[j], show = !!e && (all || (c.touched[j] && e !== 'eRequired'));
+    m.className = 'msg' + (show ? ' bad' : '');
+    m.textContent = show ? (e === 'lower' ? tr('citLower', { v: kwhStr(last[j]) }) : tr(e)) : '';
+    inp.setAttribute('aria-invalid', show ? 'true' : 'false');
+    info.textContent = tr('lastRead', { v: kwhStr(last[j]) }) + (e ? '' : ' · ' + tr('usageNow', { v: kwhStr(chk.r[j] - last[j]) }));
+  });
+  return chk;
+}
+
+function savePanelReadings() {
+  var c = state.cit, msg = $('c-msg'), btn = $('c-save');
+  if (!c.key || c.saving || !msg) return;
+  var chk = refreshCit(true);
+  if (!chk.ok) {
+    msg.className = 'sheet-msg bad';
+    msg.textContent = tr('citFix');
+    var bad = METERS.filter(function (j) { return chk.errors[j]; })[0];
+    if (bad != null) $('c-r' + bad).focus();
+    return;
+  }
+  var body = { t: todayISO(), r: chk.r };
+  c.saving = true;
+  btn.disabled = true;
+  btn.textContent = tr('citSaving');
+  msg.className = 'sheet-msg';
+  msg.textContent = '';
+  ghWriteFile(c.key, WEB.pending, JSON.stringify(body) + '\n', 'Citiri contoare ' + body.t).then(function () {
+    c.saving = false;
+    state.pendingRaw = body;
+    c.touched = {};
+    renderAll();
+    var m2 = $('c-msg');
+    if (m2) { m2.className = 'sheet-msg ok'; m2.textContent = tr('citDone'); }
+    showToast(tr('citDone'));
+  }, function (e) {
+    c.saving = false;
+    btn.disabled = false;
+    btn.innerHTML = icon('check') + esc(tr('citSave'));
+    msg.className = 'sheet-msg bad';
+    var code = e && e.code;
+    msg.textContent = code === 'badToken' || code === 'noAccess' ? tr('citExpired') : ghErrorText(e);
+  });
+}
+
+function submitUnlock() {
+  var c = state.cit, input = $('c-pass'), btn = $('c-open');
+  if (!input || !c.info || btn.disabled) return;
+  if (!input.value) { input.focus(); return; }
+  btn.disabled = true;
+  btn.textContent = tr('citChecking');
+  unlockPanel(input.value, !!($('c-remember') && $('c-remember').checked), false).then(function () {
+    renderAll();
+    var first = $('c-r0');
+    if (first) first.focus();
+  });
+}
+
 /* ------------------------------------------------------------------ admin dialog */
 
 function adminDialog() {
@@ -3076,13 +3401,81 @@ function renderAdmin() {
       '<div class="sheet-actions"><button type="submit" class="btn primary" id="adm-connect-btn">' + icon('key') + esc(tr('adminConnect')) + '</button></div></form>';
   } else {
     h += '<p class="okline">' + icon('check') + esc(tr('adminConnected', { u: g.owner })) + '</p>';
+    h += panelAdminHTML();
     h += '<div class="sheet-actions adm-foot"><button type="button" class="btn danger" data-adm="disconnect">' + esc(tr('adminDisconnect')) + '</button></div>';
   }
   dlg.innerHTML = h + '</div>';
 }
 
+/* switching the readings panel on, changing its password, or off (panel.json is then just {}) */
+state.panAdmin = { status: undefined };
+function panelAdminHTML() {
+  var s = state.panAdmin.status, on = s === 'on';
+  var h = '<section class="adm-sec" aria-labelledby="pan-title"><h3 class="h3" id="pan-title">' + esc(tr('panTitle')) + '</h3>';
+  if (s === undefined) return h + '<p class="hint">' + esc(tr('panChecking')) + '</p></section>';
+  h += '<p class="hint">' + esc(tr(on ? 'panOnText' : 'panOffText')) + '</p><p class="hint pan-risk">' + esc(tr('panRisk')) + '</p>' +
+    '<form id="pan-form" novalidate><div class="fgrid">' +
+    '<div class="field"><label for="pan-p1">' + esc(tr('panPass')) + '</label><input type="password" id="pan-p1" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>' +
+    '<div class="field"><label for="pan-p2">' + esc(tr('panPass2')) + '</label><input type="password" id="pan-p2" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>' +
+    '</div><p class="msg" id="pan-m" role="alert"></p><div class="sheet-actions"><button type="submit" class="btn primary" id="pan-btn">' + esc(tr(on ? 'panChange' : 'panOn')) + '</button>' +
+    (on ? '<button type="button" class="btn danger" data-adm="pan-off">' + esc(tr('panOffBtn')) + '</button>' : '') + '</div></form>';
+  return h + '</section>';
+}
+
+function checkPanelStatus() {
+  var g = state.gh;
+  if (!g) return;
+  ghGetFile(g, WEB.panel).then(function (f) {
+    var env = ghFileJSON(f);
+    state.panAdmin.status = env && env.ct ? 'on' : 'off';
+  }, function () { state.panAdmin.status = 'off'; }).then(function () {
+    var dlg = $('admin-dlg');
+    if (dlg && dlg.open && state.gh) renderAdmin();
+  });
+}
+
+function activatePanel() {
+  var p1 = $('pan-p1').value, p2 = $('pan-p2').value, m = $('pan-m'), btn = $('pan-btn'), g = state.gh;
+  m.className = 'msg bad';
+  if (p1.length < WEB.minPanelPass) { m.textContent = tr('panShort', { n: WEB.minPanelPass }); $('pan-p1').focus(); return; }
+  if (p1 !== p2) { m.textContent = tr('panMismatch'); $('pan-p2').focus(); return; }
+  if (!g || btn.disabled) return;
+  btn.disabled = true;
+  m.textContent = '';
+  encryptJSON({ token: g.token, owner: g.owner }, p1).then(function (env) {
+    return ghWriteFile(g, WEB.panel, JSON.stringify(env) + '\n', 'Panoul de citiri: parolă nouă').then(function () { return env; });
+  }).then(function (env) {
+    state.panAdmin.status = 'on';
+    state.cit.info = env;
+    state.cit.key = null;
+    lsDel('ff-cit');
+    $('admin-dlg').close();
+    showToast(tr('panOnT'));
+  }, function (e) {
+    btn.disabled = false;
+    m.textContent = ghErrorText(e);
+  });
+}
+
+function deactivatePanel() {
+  var g = state.gh;
+  if (!g) return;
+  ghWriteFile(g, WEB.panel, '{}\n', 'Panoul de citiri dezactivat').then(function () {
+    state.panAdmin.status = 'off';
+    state.cit.info = null;
+    state.cit.key = null;
+    lsDel('ff-cit');
+    $('admin-dlg').close();
+    showToast(tr('panOffT'));
+  }, function (e) {
+    var m = $('pan-m');
+    if (m) { m.className = 'msg bad'; m.textContent = ghErrorText(e); }
+  });
+}
+
 function openAdmin() {
   var dlg = adminDialog();
+  if (state.gh) { state.panAdmin.status = undefined; checkPanelStatus(); }
   renderAdmin();
   document.body.classList.add('locked');
   if (!dlg.open) dlg.showModal();
@@ -3098,6 +3491,7 @@ function onAdminClick(ev) {
   }
   var a = t.getAttribute('data-adm');
   if (a === 'close') $('admin-dlg').close();
+  else if (a === 'pan-off') deactivatePanel();
   else if (a === 'disconnect') {
     lsDel('ff-token');
     state.gh = null;
@@ -3118,15 +3512,18 @@ function onAdminSubmit(ev) {
     btn.textContent = tr('adminChecking');
     msg.textContent = '';
     connectOwner(token, true).then(function () {
-      $('admin-dlg').close();
+      /* stay open: the readings panel can be switched on right here */
       showToast(tr('webConnectedT'));
+      state.panAdmin.status = undefined;
+      renderAdmin();
+      checkPanelStatus();
     }, function (e) {
       btn.disabled = false;
       btn.innerHTML = icon('key') + esc(tr('adminConnect'));
       msg.className = 'msg bad';
       msg.textContent = tr(e && e.code === 'badToken' ? 'adminBadToken' : e && e.code === 'offline' ? 'webOffline' : 'adminNoRepo');
     });
-  }
+  } else if (ev.target.id === 'pan-form') activatePanel();
 }
 
 /* ------------------------------------------------------------------ events */
@@ -3160,8 +3557,31 @@ function bindWebEvents() {
       if (state.data) renderAll();
       else loadSite();
     } else if (act === 'web-admin') openAdmin();
+    else if (act === 'cit-lock') {
+      lsDel('ff-cit');
+      state.cit.key = null;
+      state.cit.passMsg = '';
+      renderAll();
+    }
   });
-  /* the browser's back and forward buttons move between the front page and #admin */
+  root.addEventListener('input', function (ev) {
+    var t = ev.target, j = t.getAttribute && t.getAttribute('data-cit');
+    if (j == null || !state.cit.key) return;
+    state.cit.draft[+j] = t.value;
+    if (String(t.value).trim() !== '') state.cit.touched[+j] = true;
+    refreshCit(false);
+  });
+  root.addEventListener('focusout', function (ev) {
+    var t = ev.target, j = t.getAttribute && t.getAttribute('data-cit');
+    if (j == null || !state.cit.key || state.cit.touched[+j]) return;
+    state.cit.touched[+j] = true;
+    refreshCit(false);
+  });
+  root.addEventListener('submit', function (ev) {
+    if (ev.target.id === 'cit-unlock') { ev.preventDefault(); submitUnlock(); }
+    else if (ev.target.id === 'cit-form') { ev.preventDefault(); savePanelReadings(); }
+  });
+  /* the browser's back and forward buttons move between the front page, #admin and #citiri */
   window.addEventListener('popstate', function () { setView(viewFromHash(), false); });
   window.addEventListener('hashchange', function () { setView(viewFromHash(), false); });
 }
@@ -3171,6 +3591,7 @@ function bindWebEvents() {
 var coreRenderAll = renderAll;
 renderAll = function () {
   if (!state.data) return;
+  if (state.view === 'panel') { renderPanel(); return; }
   if (state.view !== 'admin') { renderFront(); return; }
   coreRenderAll();
   var w = root.querySelector('.wrap');

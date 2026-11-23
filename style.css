@@ -423,3 +423,19 @@ a.btn.ghost{color:var(--ink-3)}
 .f-round{margin:16px 0 0}
 .adminbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
 .adminbar .muted{font-size:13px}
+
+/* ---- the readings panel and its switch under Administrare ---- */
+.cit .h2{margin-bottom:6px}
+.cit .stmt-lead{margin:0 0 4px}
+.cit-off{margin-top:10px}
+.cit-unlock{display:grid;gap:12px;max-width:420px;margin-top:12px}
+.cit #cit-form{margin-top:14px}
+.cit .field input[type="password"],.web-dlg .field input[type="password"]{width:100%;min-height:46px;padding:10px 12px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);font-size:16px}
+.cit .field input:focus{border-color:var(--focus);outline:none;box-shadow:0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent)}
+.cit .field input[aria-invalid="true"]{border-color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+.sheet-msg.ok{color:var(--ok)}
+.adm-sec{margin-top:18px;border-top:1px solid var(--line)}
+.adm-sec .h3{margin:16px 0 4px}
+.adm-sec .hint{margin:6px 0}
+.pan-risk{padding:8px 10px;border-radius:8px;background:var(--warn-bg);color:var(--warn)}
+#f-pending .hint{margin:6px 0 10px}
