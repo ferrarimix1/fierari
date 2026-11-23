@@ -11,6 +11,9 @@ The house's utility bills, split between the four apartments. It is a single web
   The arrows next to the month go to earlier months. Nothing can be changed there.
 - **Changes are made under Administrare** (the link at the bottom, or https://fierari.avrusu.eu/#admin). That is the full app: adding and editing months, the history chart, the Excel download and the settings.
 - **Meter readings with the password:** "Trimite citirile" at the bottom (https://fierari.avrusu.eu/#citiri). Whoever has the password can type the five meter readings, and optionally the three outside meters (gas, Electric Sus, Electric Jos). They show on the front page as new readings, with the use so far. The owner's form for the next month starts from them.
+  - After readings are sent, the page takes no new ones until the 16th of the next month (sent on 23 November: open again from 16 December). It says so, with the date.
+  - A device connected under Administrare is not held back, so the owner can correct readings at any time.
+  - This is a rule of the page, not a lock: anyone with the password also holds the GitHub key.
 - **Only the owner can change anything.** A device can add or edit months once it is connected with a GitHub key that may write to this repository. The key stays on that device. Each save is one commit to `data.json`, and the site shows it to everyone within 1–2 minutes.
 - **The figures are public.** `data.json` holds the months in plain text, in this public repository and on the site. Search engines are asked not to index the site, but anyone with the address can read it. Keep names and other personal details out of the notes.
 

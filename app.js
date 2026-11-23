@@ -1024,7 +1024,11 @@ function exprDisplay(t) {
   if (state.lang === 'ro') s = s.replace(/(\d)\.(\d)/g, '$1,$2');
   return s.replace(/\s+/g, ' ').trim();
 }
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+/* today's date where the page is open (not UTC), as YYYY-MM-DD */
+function todayISO() {
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
@@ -2569,6 +2573,10 @@ Object.assign(I18N.ro, {
   citUse: 'consum: {v} {u}',
   citLock: 'Închide panoul pe acest dispozitiv',
   citSent: 'Ultimele citiri au fost trimise pe {d}. Le poți corecta trimițându-le din nou.',
+  citWait: 'Citirile au fost trimise pe {d}. Următoarele se pot trimite de pe {n}.',
+  citWaitHint: 'Dacă e o greșeală în ele, anunță proprietarul.',
+  citWaitNow: 'Între timp s-au trimis citiri, pe {d}. Următoarele se pot trimite de pe {n}.',
+  citOwnerWait: 'Ceilalți pot trimite din nou de pe {n}. Tu poți trimite oricând, fiind conectat ca administrator.',
   pendTitle: 'Citiri noi pentru {m}',
   estTitle: 'Curentul estimat, la {p}',
   estNote: 'Consumul înmulțit cu prețul din {m}. Suma finală se vede după ce se adaugă luna, cu prețul ei.',
@@ -2679,6 +2687,10 @@ Object.assign(I18N.en, {
   citUse: 'use: {v} {u}',
   citLock: 'Close the panel on this device',
   citSent: 'The last readings were sent on {d}. You can correct them by sending them again.',
+  citWait: 'The readings were sent on {d}. The next ones can be sent from {n}.',
+  citWaitHint: "If there's a mistake in them, tell the owner.",
+  citWaitNow: 'Readings were sent in the meantime, on {d}. The next ones can be sent from {n}.',
+  citOwnerWait: 'Others can send again from {n}. You can send at any time, as you are connected as the owner.',
   pendTitle: 'New readings for {m}',
   estTitle: 'Electricity, estimated at {p}',
   estNote: 'The use times the price from {m}. The final amount shows once the month is added, with its own price.',
@@ -3394,7 +3406,25 @@ function adminBarHTML() {
    password decrypts panel.json, the copy of the owner's key the owner stored when switching the
    panel on; with it the page commits citiri.json and nothing else. */
 
-state.cit = { info: undefined, key: null, draft: ['', '', '', '', ''], gdraft: ['', '', ''], touched: {}, passMsg: '', saving: false };
+state.cit = { info: undefined, key: null, draft: ['', '', '', '', ''], gdraft: ['', '', ''], touched: {}, passMsg: '', saving: false, justSent: false };
+
+/* Once readings are sent, the readings page waits until the 16th of the following month (sent on
+   23 November: open again from 16 December). A device connected under Administrare is not held
+   back: the owner can correct readings at any time. The page enforces this; whoever has the
+   password also holds the key, so it is a rule for the page, not a lock. */
+function nextReadingDay(t) {
+  var m = /^(\d{4})-(\d{2})-\d{2}$/.exec(t || '');
+  if (!m) return null;
+  var y = +m[1], mo = +m[2] + 1;
+  if (mo > 12) { mo = 1; y++; }
+  return y + '-' + ('0' + mo).slice(-2) + '-16';
+}
+/* the wait in force after the readings in citiri.json, or null */
+function citWait(raw) {
+  var t = raw && typeof raw.t === 'string' ? raw.t : null, open = nextReadingDay(t);
+  return open && todayISO() < open ? { t: t, open: open } : null;
+}
+function ownerDevice() { return !!state.gh || !!lsGet('ff-token'); }
 
 /* whether the panel is switched on (panel.json exists); a remembered password opens it at once */
 function loadPanelInfo() {
@@ -3413,7 +3443,7 @@ function unlockPanel(pass, remember, silent) {
     c.key = { token: k.token, owner: k.owner };
     if (remember) lsSet('ff-cit', pass);
     c.passMsg = '';
-    var p = pendingReadings();
+    var p = ownerDevice() ? pendingReadings() : null;
     c.draft = METERS.map(function (j) { return p ? numToInput(p.r[j]) : ''; });
     c.gdraft = [0, 1, 2].map(function (j) { return p && p.g && p.g[j] != null ? numToInput(p.g[j]) : ''; });
     c.touched = {};
@@ -3429,15 +3459,21 @@ function renderPanel() {
     icon('prev') + esc(tr('fBack')) + '</a></nav><section class="panel cit" aria-labelledby="c-title"><h2 class="h2" id="c-title">' + esc(tr('citTitle')) + '</h2>';
   if (c.info === undefined) h += '<p class="hint">' + esc(tr('panChecking')) + '</p>';
   else if (!c.info) h += '<p class="basenote cit-off">' + esc(tr('citOff')) + '</p>';
-  else if (!c.key) {
+  else if (!ownerDevice() && citWait(state.pendingRaw)) {
+    var w = citWait(state.pendingRaw);
+    h += '<p class="stmt-lead cit-wait">' + esc(tr('citWait', { d: fmtDay(w.t), n: fmtDay(w.open) })) + '</p>' +
+      (c.justSent ? '<p class="sheet-msg ok" id="c-msg" role="status">' + esc(tr('citDone')) + '</p>' : '<p class="hint">' + esc(tr('citWaitHint')) + '</p>') +
+      (c.key ? '<div class="sheet-actions"><button type="button" class="btn ghost" data-action="cit-lock">' + esc(tr('citLock')) + '</button></div>' : '');
+  } else if (!c.key) {
     h += '<form id="cit-unlock" class="cit-unlock" novalidate><div class="field"><label for="c-pass">' + esc(tr('citPass')) + '</label>' +
       '<input type="password" id="c-pass" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" aria-describedby="c-pass-m"' + (c.passMsg ? ' aria-invalid="true"' : '') + '></div>' +
       '<label class="check"><input type="checkbox" id="c-remember">' + esc(tr('citRemember')) + '</label>' +
       '<p class="msg bad" id="c-pass-m" role="alert">' + esc(c.passMsg) + '</p>' +
       '<div class="sheet-actions"><button type="submit" class="btn primary" id="c-open">' + esc(tr('citOpen')) + '</button></div></form>';
   } else {
-    var p = pendingReadings();
+    var p = ownerDevice() ? pendingReadings() : null, ow = ownerDevice() ? citWait(state.pendingRaw) : null;
     h += '<p class="stmt-lead">' + esc(tr('citIntro', { m: mName(n) })) + '</p>' + (p ? '<p class="hint">' + esc(tr('citSent', { d: fmtDay(p.t) })) + '</p>' : '') +
+      (ow ? '<p class="hint">' + esc(tr('citOwnerWait', { n: fmtDay(ow.open) })) + '</p>' : '') +
       '<form id="cit-form" novalidate><div class="fgrid five">';
     METERS.forEach(function (j) {
       var id = 'c-r' + j;
@@ -3457,8 +3493,9 @@ function renderPanel() {
       '<button type="button" class="btn ghost" data-action="cit-lock">' + esc(tr('citLock')) + '</button></div></form>';
   }
   root.innerHTML = h + '</section><footer class="foot" id="foot"></footer></main>';
+  c.justSent = false;
   renderFooter();
-  if (c.key) refreshCit(false);
+  if ($('cit-form')) refreshCit(false);
   var f = $('c-pass');
   if (f && c.passMsg) f.focus();
 }
@@ -3538,17 +3575,28 @@ function savePanelReadings() {
   msg.textContent = '';
   isCurrent().then(function (cur) {
     if (!cur) throw { code: 'stale' };
+    return ownerDevice() ? null : ghGetFile(c.key, WEB.pending);
+  }).then(function (f) {
+    /* readings sent from elsewhere while this page was open start the wait too */
+    var raw = f ? ghFileJSON(f) : null, w = raw ? citWait(raw) : null;
+    if (w) { state.pendingRaw = raw; throw { code: 'wait', w: w }; }
     return ghWriteFile(c.key, WEB.pending, JSON.stringify(body) + '\n', 'Citiri contoare ' + body.t);
   }).then(function () {
     c.saving = false;
     state.pendingRaw = body;
     c.touched = {};
+    c.justSent = true;
     renderAll();
     var m2 = $('c-msg');
     if (m2) { m2.className = 'sheet-msg ok'; m2.textContent = tr('citDone'); }
     showToast(tr('citDone'));
   }, function (e) {
     c.saving = false;
+    if (e && e.code === 'wait') {
+      renderAll();
+      showToast(tr('citWaitNow', { d: fmtDay(e.w.t), n: fmtDay(e.w.open) }));
+      return;
+    }
     btn.disabled = false;
     btn.innerHTML = icon('check') + esc(tr('citSave'));
     msg.className = 'sheet-msg bad';
@@ -3579,7 +3627,7 @@ function isCurrent() {
 }
 function busy() {
   var dlg = $('admin-dlg');
-  return !!state.sheet || !!(dlg && dlg.open) || (state.view === 'panel' && !!state.cit.key);
+  return !!state.sheet || !!(dlg && dlg.open) || (state.view === 'panel' && !!$('cit-form'));
 }
 var hiddenAt = 0;
 function onVisibility() {
