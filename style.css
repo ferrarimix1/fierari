@@ -438,3 +438,7 @@ a.btn.ghost{color:var(--ink-3)}
 .est .hb-sub{margin-top:0}
 .est .hint{margin:6px 0 0}
 #c-est:empty{display:none}
+/* the outside meters, at the bottom of the front page and on the readings page */
+#f-general thead th{white-space:normal}
+.cit-gen{margin-top:8px}
+.cit-gen .hint{margin:0 0 12px}

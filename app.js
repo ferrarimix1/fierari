@@ -58,6 +58,12 @@ function normalizeEl(a) {
     .slice(0, MAX_EL).map(function (b) { return { lei: Number(b.lei), kwh: Number(b.kwh) }; });
 }
 
+/* the outside meters' readings, [gas, electricity upstairs, electricity downstairs]; null where not read */
+function normalizeG(g) {
+  if (!Array.isArray(g) || !g.some(function (v) { return v != null && v !== ''; })) return null;
+  return g.slice(0, 3).map(function (v) { return v == null || v === '' || !num(Number(v)) ? null : Number(v); });
+}
+
 function normalizeMonth(m) {
   var o = {};
   /* The record can begin with the starting meter readings only: nothing to pay. It may carry that
@@ -71,6 +77,8 @@ function normalizeMonth(m) {
     var spk = elPrice(o.el);
     if (spk == null && m.pk != null && num(Number(m.pk)) && Number(m.pk) > 0) spk = Number(m.pk);
     if (spk != null) o.pk = spk;
+    var sg = normalizeG(m.g);
+    if (sg) o.g = sg;
     if (m.t) o.t = String(m.t);
     return o;
   }
@@ -101,9 +109,8 @@ function normalizeMonth(m) {
     }
   }
   o.p = (m.p || []).slice(0, 4).map(Number);
-  if (Array.isArray(m.g) && m.g.some(function (v) { return v != null && v !== ''; })) {
-    o.g = m.g.slice(0, 3).map(function (v) { return v == null || v === '' ? null : Number(v); });
-  }
+  var g = normalizeG(m.g);
+  if (g) o.g = g;
   if (Array.isArray(m.manual)) o.manual = m.manual.slice(0, 4).map(Number);
   if (m.note) o.note = String(m.note).slice(0, 200);
   if (m.t) o.t = String(m.t);
@@ -221,9 +228,12 @@ function computeMonth(data, i) {
   /* With a price per kWh (November 2026 on), each apartment pays its kWh at that price. Before,
      the whole electricity bill was shared out in proportion to the kWh. */
   var byPrice = num(m.pk);
+  /* From December 2026 (the months with their own rubbish line) DIGI is split equally between the
+     apartments. Before, DIGI with the rubbish inside it was split by people, as in the Excel. */
+  var digiEq = num(m.gunoi);
   var parts = {
     gaz: sh.map(function (s) { return m.gaz * s; }),
-    digi: m.p.map(function (p) { return P > 0 ? m.digi * p / P : NaN; }),
+    digi: digiEq ? APTS.map(function () { return m.digi / APTS.length; }) : m.p.map(function (p) { return P > 0 ? m.digi * p / P : NaN; }),
     gunoi: APTS.map(function () { return gunoi; }),
     apa: m.p.map(function (p) { return P > 0 ? m.apa * p / P : NaN; }),
     curent: kwhPay.map(function (k) { return byPrice ? m.pk * k : K === 0 ? 0 : m.curent * k / K; })
@@ -234,9 +244,33 @@ function computeMonth(data, i) {
   var ok = pay.every(num);
   var cents = ok ? splitCents(pay, Math.round(due * 100)) : [NaN, NaN, NaN, NaN];
   return {
-    i: i, manual: false, byPrice: byPrice, pk: byPrice ? m.pk : null, elDue: elDue, due: round2(due), billTotal: billTotal,
+    i: i, manual: false, byPrice: byPrice, digiEq: digiEq, pk: byPrice ? m.pk : null, elDue: elDue, due: round2(due), billTotal: billTotal,
     shares: sh, kwh: kwh, K: K, P: P, kwhPay: kwhPay, parts: parts, pay: pay, cents: cents, total: sum(cents) / 100
   };
+}
+
+/* the latest reading of outside meter j before record i, with the record it is from */
+function lastGen(data, i, j) {
+  for (var k = Math.min(i, data.months.length) - 1; k >= 0; k--) {
+    var g = data.months[k].g;
+    if (g && num(g[j])) return { v: g[j], i: k };
+  }
+  return null;
+}
+
+/* the outside meters as typed (each optional); a reading below the last one is only a warning */
+function parseGeneral(data, i, d, errors, warnings) {
+  var g = [null, null, null], any = false;
+  [0, 1, 2].forEach(function (j) {
+    var r = parseExpr(d.g && d.g[j], 'plain');
+    if (r.empty) return;
+    if (r.error || r.value < 0) { errors['g' + j] = { code: r.error === 'thousands' ? 'thousands' : 'plain' }; return; }
+    g[j] = r.value;
+    any = true;
+    var lg = lastGen(data, i, j);
+    if (lg && r.value < lg.v) warnings['g' + j] = { code: 'genLower', v: lg.v };
+  });
+  return any ? g : null;
 }
 
 function lastPrice(data, i) {
@@ -412,15 +446,8 @@ function validateDraft(data, i, d) {
   });
   if (peopleOk && sum(out.p) === 0) { global.push({ code: 'personsZero' }); peopleOk = false; }
 
-  var g = [null, null, null], anyG = false;
-  [0, 1, 2].forEach(function (j) {
-    var r = parseExpr(d.g[j], 'plain');
-    if (r.empty) return;
-    if (r.error || r.value < 0) { errors['g' + j] = { code: r.error === 'thousands' ? 'thousands' : 'plain' }; return; }
-    g[j] = r.value;
-    anyG = true;
-  });
-  if (anyG) out.g = g;
+  var g = parseGeneral(data, i, d, errors, warnings);
+  if (g) out.g = g;
 
   var note = String(d.note || '').trim();
   if (note.length > 200) errors.note = { code: 'note' };
@@ -466,6 +493,8 @@ function validateStart(data, d) {
     out.p[a] = +t;
   });
   if (peopleOk && sum(out.p) === 0) global.push({ code: 'personsZero' });
+  var sg = parseGeneral(data, 0, d, errors, {});
+  if (sg) out.g = sg;
   var next = data.months[1];
   if (next && readingsOk) {
     METERS.forEach(function (j) {
@@ -538,6 +567,7 @@ var I18N = {
     curentP: 'Curent',
     byArea: 'după suprafață',
     byPeople: 'după persoane',
+    byEqual: 'în părți egale pe apartament',
     byKwh: 'proporțional cu kWh',
     byPrice: 'kWh × preț',
     kwhTimes: '{k} kWh × {p}',
@@ -555,6 +585,7 @@ var I18N = {
     allApts: 'Toate apartamentele',
     lineArea: '{b} × {pct} cota de suprafață',
     linePeople: '{b} × {p} din {P} {w}',
+    lineEqual: '{b} ÷ {n} apartamente',
     lineKwh: '{b} × {k} din {K} kWh',
     kwhDetail: '{k} kWh de plată = {own} kWh consum propriu + {com} kWh din consumul comun ({pct} din {c} kWh)',
     personOne: 'persoană',
@@ -595,7 +626,9 @@ var I18N = {
     showLess: 'Arată doar ultimele 12 luni',
     rulesTitle: 'Cum se împart facturile',
     ruleGaz: 'Gazul se împarte după cota de suprafață a fiecărui apartament.',
-    rulePeople: 'DIGI și apa se împart după numărul de persoane din luna respectivă.',
+    ruleDigi: 'DIGI se împarte în părți egale între cele {n} apartamente.',
+    ruleDigiOld: 'Până în {m} inclusiv, DIGI (cu gunoiul inclus) s-a împărțit după persoane.',
+    ruleApa: 'Apa se împarte după numărul de persoane din luna respectivă.',
     ruleGunoi: 'Gunoiul nu se împarte: fiecare apartament plătește aceeași sumă fixă, {v} pe lună.',
     ruleKwh: 'Fiecare apartament plătește consumul de pe propriul contor. Doar consumul contorului comun se împarte, după cota de suprafață. Toți kWh-ii se plătesc la prețul pe kWh al lunii, din factura de curent.',
     ruleKwhOld: 'Până în {m} inclusiv, factura de curent s-a împărțit proporțional cu acești kWh.',
@@ -664,6 +697,8 @@ var I18N = {
     wBillHigh: 'Mult peste ultimele luni (maximum {v}). Verifică.',
     wKwhHigh: 'Consum mult peste ultimele luni (maximum {v} kWh). Verifică.',
     wPriceOff: 'Mult diferit de prețul anterior ({v}). Verifică.',
+    wGenLower: 'E mai mică decât ultima citire ({v}). Verifică.',
+    genLast: 'ultima: {v} ({m})',
     savedT: '{m} a fost salvată.',
     deletedT: '{m} a fost ștearsă.',
     settingsT: 'Setările au fost salvate.',
@@ -734,6 +769,7 @@ var I18N = {
     curentP: 'Electricity',
     byArea: 'by floor area',
     byPeople: 'by people',
+    byEqual: 'equally per apartment',
     byKwh: 'in proportion to kWh',
     byPrice: 'kWh × price',
     kwhTimes: '{k} kWh × {p}',
@@ -751,6 +787,7 @@ var I18N = {
     allApts: 'All apartments',
     lineArea: '{b} × {pct} floor-area share',
     linePeople: '{b} × {p} of {P} {w}',
+    lineEqual: '{b} ÷ {n} apartments',
     lineKwh: '{b} × {k} of {K} kWh',
     kwhDetail: '{k} kWh to pay = {own} kWh own use + {com} kWh of the common use ({pct} of {c} kWh)',
     personOne: 'person',
@@ -791,7 +828,9 @@ var I18N = {
     showLess: 'Show only the last 12 months',
     rulesTitle: 'How the bills are split',
     ruleGaz: "Gas is split by each apartment's share of the floor area.",
-    rulePeople: 'DIGI and water are split by the number of people living there that month.',
+    ruleDigi: 'DIGI is split equally between the {n} apartments.',
+    ruleDigiOld: 'Up to {m}, DIGI (with the rubbish in it) was split by people.',
+    ruleApa: 'Water is split by the number of people living there that month.',
     ruleGunoi: 'Rubbish is not split: every apartment pays the same fixed amount, {v} a month.',
     ruleKwh: "Each apartment pays for the use on its own meter. Only the common meter's use is split, by floor-area share. All kWh are paid at the month's price per kWh, from the electricity bill.",
     ruleKwhOld: 'Up to and including {m}, the electricity bill was shared out in proportion to these kWh.',
@@ -860,6 +899,8 @@ var I18N = {
     wBillHigh: 'Well above recent months (highest {v}). Check it.',
     wKwhHigh: 'Use well above recent months (highest {v} kWh). Check it.',
     wPriceOff: 'Far from the previous price ({v}). Check it.',
+    wGenLower: 'Lower than the last reading ({v}). Check it.',
+    genLast: 'last: {v} ({m})',
     savedT: '{m} saved.',
     deletedT: '{m} deleted.',
     settingsT: 'Settings saved.',
@@ -1156,7 +1197,7 @@ function renderMonth() {
 
   /* the starting readings: nothing to pay; maybe the price the next month starts from */
   if (c.start) {
-    h += '<p class="basenote">' + esc(tr('baseNote', { m: mName(i + 1) })) + '</p>' + metersHTML(i) + startPriceHTML(i);
+    h += '<p class="basenote">' + esc(tr('baseNote', { m: mName(i + 1) })) + '</p>' + metersHTML(i) + genLineHTML(m) + startPriceHTML(i);
     el.innerHTML = h;
     return;
   }
@@ -1206,16 +1247,19 @@ function renderMonth() {
       h += '<p class="hint">' + esc(tr('pickApt')) + '</p>' + splitTableHTML(i) + basisTableHTML(i);
     }
   }
-  h += metersHTML(i);
-  if (m.g) {
-    var gl = ['genGaz', 'genSus', 'genJos'].map(function (k, j) { return m.g[j] == null ? null : tr(k) + ' ' + kwhStr(m.g[j]); }).filter(Boolean);
-    if (gl.length) h += '<p class="gen-line">' + esc(tr('general')) + ': ' + esc(gl.join(' · ')) + '</p>';
-  }
+  h += metersHTML(i) + genLineHTML(m);
   el.innerHTML = h;
 }
 
+/* the outside meters' readings in one line (they are not part of the split) */
+function genLineHTML(m) {
+  if (!m.g) return '';
+  var gl = GEN_KEYS.map(function (k, j) { return m.g[j] == null ? null : tr(k) + ' ' + kwhStr(m.g[j]); }).filter(Boolean);
+  return gl.length ? '<p class="gen-line">' + esc(tr('general')) + ': ' + esc(gl.join(' · ')) + '</p>' : '';
+}
+
 function ruleOf(c, b) {
-  return b === 'gaz' ? 'byArea' : b === 'gunoi' ? 'byFixed' : b === 'curent' ? (c.byPrice ? 'byPrice' : 'byKwh') : 'byPeople';
+  return b === 'gaz' ? 'byArea' : b === 'gunoi' ? 'byFixed' : b === 'curent' ? (c.byPrice ? 'byPrice' : 'byKwh') : b === 'digi' && c.digiEq ? 'byEqual' : 'byPeople';
 }
 
 /* A price per kWh in a box: its bills (lei and kWh), the division, then a closing sentence. */
@@ -1260,7 +1304,7 @@ function narrativeHTML(i, a) {
     tr('lineKwh', { b: money(m.curent), k: kwhStr(c.kwhPay[a]), K: kwhStr(c.K) });
   var rows = [
     ['gaz', tr('lineArea', { b: money(m.gaz), pct: pct(c.shares[a]) }), c.parts.gaz[a], ''],
-    ['digi', tr('linePeople', { b: money(m.digi), p: m.p[a], P: c.P, w: peopleWord(c.P) }), c.parts.digi[a], ''],
+    ['digi', c.digiEq ? tr('lineEqual', { b: money(m.digi), n: APTS.length }) : tr('linePeople', { b: money(m.digi), p: m.p[a], P: c.P, w: peopleWord(c.P) }), c.parts.digi[a], ''],
     ['gunoi', tr('lineFixed'), c.parts.gunoi[a], ''],
     ['apa', tr('linePeople', { b: money(m.apa), p: m.p[a], P: c.P, w: peopleWord(c.P) }), c.parts.apa[a], ''],
     ['curent', elLine, c.parts.curent[a],
@@ -1557,8 +1601,12 @@ function renderRules() {
     }
   }
   var h = '<h2 class="h2" id="rules-title">' + esc(tr('rulesTitle')) + '</h2><div class="rules-grid"><ul class="rules-list">';
-  [['gaz', tr('ruleGaz')], ['digi', tr('rulePeople')], ['gunoi', tr('ruleGunoi', { v: lei(fee == null ? 22 : fee) })], ['curent', elRule]].forEach(function (r) {
-    var tag = r[0] === 'digi' ? tr('digi') + ' · ' + tr('apa') : r[0] === 'curent' ? tr('curentP') : tr(r[0]);
+  /* DIGI: equal parts, except in the months from the Excel (rubbish inside DIGI, split by people) */
+  var lastOld = -1;
+  state.data.months.forEach(function (mm, k) { if (k > 0 && !mm.manual && !mm.start && !num(mm.gunoi)) lastOld = k; });
+  var digiRule = tr('ruleDigi', { n: APTS.length }) + (lastOld >= 0 ? ' ' + tr('ruleDigiOld', { m: mName(lastOld) }) : '');
+  [['gaz', tr('ruleGaz')], ['digi', digiRule], ['gunoi', tr('ruleGunoi', { v: lei(fee == null ? 22 : fee) })], ['apa', tr('ruleApa')], ['curent', elRule]].forEach(function (r) {
+    var tag = r[0] === 'curent' ? tr('curentP') : tr(r[0]);
     h += '<li><span class="rtag">' + esc(tag) + '</span><span>' + esc(r[1]) + '</span></li>';
   });
   h += '</ul><div><p class="eyebrow">' + esc(tr('shares')) + '</p><div class="segbar" role="img" aria-label="' +
@@ -1728,13 +1776,23 @@ function peopleFieldsetHTML(d) {
 /* The starting readings (and the people living there then), for when one was copied wrong. */
 function openBaseSheet() {
   var b = state.data.months[0];
-  state.sheet = { kind: 'base', index: 0, draft: { r: b.r.map(numToInput), p: b.p.map(String) }, touched: {}, submitted: false, saving: false, opener: document.activeElement };
+  var g = b.g ? b.g.map(function (v) { return v == null ? '' : numToInput(v); }) : ['', '', ''];
+  state.sheet = { kind: 'base', index: 0, draft: { r: b.r.map(numToInput), p: b.p.map(String), g: g }, touched: {}, submitted: false, saving: false, opener: document.activeElement };
   renderSheet();
   var f = $('f-r0');
   if (f) f.focus();
 }
 
-var BASE_KEYS = ['r0', 'r1', 'r2', 'r3', 'r4', 'p0', 'p1', 'p2', 'p3'];
+var BASE_KEYS = ['r0', 'r1', 'r2', 'r3', 'r4', 'p0', 'p1', 'p2', 'p3', 'g0', 'g1', 'g2'];
+var GEN_KEYS = ['genGaz', 'genSus', 'genJos'];
+
+/* the three outside meters as form fields, each with its latest reading before record i */
+function generalFieldsHTML(d, i) {
+  return GEN_KEYS.map(function (k, j) {
+    var lg = lastGen(state.data, i, j);
+    return inputField('g' + j, tr(k), d.g[j], 'decimal', { info: lg ? tr('genLast', { v: kwhStr(lg.v), m: mName(lg.i) }) : '' });
+  }).join('');
+}
 
 function baseSheetHTML(sh) {
   var d = sh.draft;
@@ -1745,6 +1803,7 @@ function baseSheetHTML(sh) {
   h += '<fieldset class="fs"><legend class="eyebrow">' + eyebrow(tr('secReadings')) + '</legend><div class="fgrid five">';
   METERS.forEach(function (j) { h += inputField('r' + j, meterName(j), d.r[j], 'decimal', { key: j < 4 ? j : null }); });
   h += '</div></fieldset>' + peopleFieldsetHTML(d);
+  h += '<fieldset class="fs"><legend class="eyebrow">' + esc(tr('secGeneral')) + '</legend><div class="fgrid three">' + generalFieldsHTML(d, 0) + '</div></fieldset>';
   h += '<ul class="pv-global" id="base-global"></ul><p class="sheet-msg" id="sheet-msg" role="alert"></p>';
   h += '<div class="sheet-actions"><button type="submit" class="btn primary" id="save-btn">' + icon('check') + esc(tr('baseSave')) + '</button>' +
     '<button type="button" class="btn" data-action="close-sheet">' + esc(tr('close')) + '</button></div>';
@@ -1754,7 +1813,7 @@ function baseSheetHTML(sh) {
 function refreshBase() {
   var sh = state.sheet, v = validateStart(state.data, sh.draft);
   sh.v = v;
-  BASE_KEYS.forEach(function (f) { setFieldMsg(f, v.errors[f], null, sh.submitted || sh.touched[f]); });
+  BASE_KEYS.forEach(function (f) { setFieldMsg(f, v.errors[f], v.warnings[f], sh.submitted || sh.touched[f]); });
   var g = $('base-global');
   if (g) g.innerHTML = v.global.map(function (x) { return '<li>' + esc(errText(x)) + '</li>'; }).join('');
 }
@@ -1802,7 +1861,7 @@ function monthSheetHTML(sh) {
   h += peopleFieldsetHTML(d);
   h += '<div class="fs"><div class="fgrid">' + inputField('note', tr('secNote'), d.note, 'text', { wide: true, ph: tr('notePh'), max: 200 }) + '</div></div>';
   h += '<details class="gen"' + (d.g.some(function (v) { return v; }) ? ' open' : '') + '><summary>' + esc(tr('secGeneral')) + '</summary><div class="fgrid three">' +
-    ['genGaz', 'genSus', 'genJos'].map(function (k, j) { return inputField('g' + j, tr(k), d.g[j], 'decimal'); }).join('') + '</div></details>';
+    generalFieldsHTML(d, i) + '</div></details>';
   h += '<div class="preview" id="preview" aria-live="polite"></div>';
   h += '<p class="sheet-msg" id="sheet-msg" role="alert"></p>';
   h += '<div class="sheet-actions"><button type="submit" class="btn primary" id="save-btn">' + icon('check') + esc(tr('save')) + '</button>' +
@@ -1881,6 +1940,7 @@ function errText(e) {
 }
 function warnText(w) {
   if (w.code === 'priceOff') return tr('wPriceOff', { v: priceStr(w.v) });
+  if (w.code === 'genLower') return tr('wGenLower', { v: kwhStr(w.v) });
   return w.code === 'billHigh' ? tr('wBillHigh', { v: lei(w.v) }) : tr('wKwhHigh', { v: kwhStr(w.v) });
 }
 
@@ -2298,6 +2358,7 @@ function onInput(ev) {
   if (sh.kind === 'base') {
     if (/^r[0-4]$/.test(f)) d.r[+f.slice(1)] = t.value;
     else if (/^p[0-3]$/.test(f)) d.p[+f.slice(1)] = t.value;
+    else if (/^g[0-2]$/.test(f)) d.g[+f.slice(1)] = t.value;
     else return;
     if (ev.type === 'change' || String(t.value).trim() !== '') sh.touched[f] = true;
     refreshSheet();
@@ -2467,6 +2528,11 @@ Object.assign(I18N.ro, {
   fPeopleHow: '{b} ÷ {P} {w} = {v} de persoană',
   fPeopleHowApprox: '{b} ÷ {P} {w} ≈ {v} de persoană',
   fGunoiHow: '{v} de fiecare apartament × {n} = {t}',
+  fDigiHow: '{b} ÷ {n} apartamente = {v} de fiecare apartament',
+  fDigiHowApprox: '{b} ÷ {n} apartamente ≈ {v} de fiecare apartament',
+  fGenTitle: 'Contoarele generale',
+  fGenLead: 'Contoarele furnizorilor, de afară: gazul și cele două de curent. Nu intră în împărțirea facturilor.',
+  fGenSent: 'Trimise pe {d}',
   fElHow: '{K} kWh × {p} = {v}',
   fElPropHow: '{b} se împarte proporțional cu kWh-ii de plată ({K} kWh în total)',
   fColApt: 'Apartament',
@@ -2497,6 +2563,10 @@ Object.assign(I18N.ro, {
   citLower: 'E mai mică decât ultima citire ({v}). Verifică; dacă s-a schimbat contorul, anunță proprietarul.',
   citExpired: 'Panoul nu mai poate salva: cheia lui nu mai e valabilă. Anunță proprietarul să activeze panoul din nou.',
   citFix: 'Corectează citirile marcate.',
+  citGenTitle: 'Contoarele generale (opțional)',
+  citGenHint: 'Contoarele furnizorilor, de afară: gazul și cele două de curent. Nu intră în calcul; completează-le dacă le-ai citit.',
+  citGenBig: 'Cu peste 10.000 peste ultima citire ({v}). Verifică.',
+  citUse: 'consum: {v} {u}',
   citLock: 'Închide panoul pe acest dispozitiv',
   citSent: 'Ultimele citiri au fost trimise pe {d}. Le poți corecta trimițându-le din nou.',
   pendTitle: 'Citiri noi pentru {m}',
@@ -2568,6 +2638,11 @@ Object.assign(I18N.en, {
   fPeopleHow: '{b} ÷ {P} {w} = {v} per person',
   fPeopleHowApprox: '{b} ÷ {P} {w} ≈ {v} per person',
   fGunoiHow: '{v} per apartment × {n} = {t}',
+  fDigiHow: '{b} ÷ {n} apartments = {v} each',
+  fDigiHowApprox: '{b} ÷ {n} apartments ≈ {v} each',
+  fGenTitle: 'Main meters',
+  fGenLead: "The providers' meters outside: gas and the two electricity meters. They are not used to split the bills.",
+  fGenSent: 'Sent on {d}',
   fElHow: '{K} kWh × {p} = {v}',
   fElPropHow: '{b} is shared out in proportion to the kWh to pay ({K} kWh in all)',
   fColApt: 'Apartment',
@@ -2598,6 +2673,10 @@ Object.assign(I18N.en, {
   citLower: 'Lower than the last reading ({v}). Check it; if the meter was replaced, tell the owner.',
   citExpired: 'The panel can no longer save: its key no longer works. Ask the owner to switch the panel on again.',
   citFix: 'Correct the marked readings.',
+  citGenTitle: 'Main meters (optional)',
+  citGenHint: "The providers' meters outside: gas and the two electricity meters. They are not used in the split; fill them in if you read them.",
+  citGenBig: 'More than 10,000 above the last reading ({v}). Check it.',
+  citUse: 'use: {v} {u}',
   citLock: 'Close the panel on this device',
   citSent: 'The last readings were sent on {d}. You can correct them by sending them again.',
   pendTitle: 'New readings for {m}',
@@ -3073,7 +3152,7 @@ function roundLoose(real, C) {
 
 function renderFront() {
   var paid = paidMonths(), i = frontIndex(paid);
-  var h = bandHTML() + '<main class="wrap front">' + (i < 0 ? frontEmptyHTML() : frontMonthHTML(i, paid)) +
+  var h = bandHTML() + '<main class="wrap front">' + (i < 0 ? frontEmptyHTML() : frontMonthHTML(i, paid)) + generalHTML() +
     '<footer class="foot" id="foot"></footer></main>';
   root.innerHTML = h;
   renderFooter();
@@ -3117,14 +3196,20 @@ function estimateHTML(e) {
 
 /* ------------------------------------------------------------------ readings sent through the panel
 
-   citiri.json = {t: "YYYY-MM-DD", r: [five readings]}. They count as new readings for the next month
-   until a month uses them: none may be below the latest month's readings and one must be above. */
+   citiri.json = {t: "YYYY-MM-DD", r: [five readings], g: [gas, electricity upstairs, downstairs]}, g
+   optional. They count as new readings for the next month until a month uses them: none of the five
+   may be below the latest month's readings and one must be above. */
 function pendingReadings() {
   var p = state.pendingRaw, ms = state.data && state.data.months;
   if (!p || !Array.isArray(p.r) || p.r.length !== METERS.length || !ms || !ms.length) return null;
   var last = ms[ms.length - 1].r, r = p.r.map(Number);
   if (!r.every(num) || r.some(function (v, j) { return v < last[j]; }) || r.every(function (v, j) { return v === last[j]; })) return null;
-  return { r: r, t: typeof p.t === 'string' ? p.t : '', last: last };
+  return { r: r, g: normalizeG(p.g), t: typeof p.t === 'string' ? p.t : '', last: last };
+}
+
+function fmtDayShort(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return '—';
+  return new Intl.DateTimeFormat(I18N[state.lang].locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(iso + 'T00:00:00Z'));
 }
 
 function fmtDay(iso) {
@@ -3155,6 +3240,7 @@ var coreDraftForAdd = draftForAdd;
 draftForAdd = function () {
   var d = coreDraftForAdd(), p = pendingReadings();
   if (p) d.r = p.r.map(numToInput);
+  if (p && p.g) d.g = p.g.map(function (v) { return v == null ? '' : numToInput(v); });
   return d;
 };
 
@@ -3217,6 +3303,9 @@ function howBlockHTML(i, t, b) {
   if (b === 'gaz') {
     h += formula(tr('fGazHow', { b: lei(m.gaz) }));
     h += aptTableHTML([tr('fColShare')], function (a) { return [pct(c.shares[a])]; }, [pct(1)], t.cell.gaz, t.rowTot.gaz);
+  } else if (b === 'digi' && c.digiEq) {
+    var each = m.digi / APTS.length, even = Math.abs(each * 100 - Math.round(each * 100)) < 1e-6;
+    h += formula(tr(even ? 'fDigiHow' : 'fDigiHowApprox', { b: lei(m.digi), n: APTS.length, v: lei(each) }));
   } else if (b === 'digi' || b === 'apa') {
     var per = m[b] / c.P, exact = Math.abs(per * 100 - Math.round(per * 100)) < 1e-6;
     h += formula(tr(exact ? 'fPeopleHow' : 'fPeopleHowApprox', { b: lei(m[b]), P: c.P, w: peopleWord(c.P), v: lei(per) }));
@@ -3234,6 +3323,30 @@ function howBlockHTML(i, t, b) {
     h += '<p class="hint">' + esc(tr('commonNote')) + '</p>';
   }
   return h + '</div>';
+}
+
+function genUnit(j) { return j === 0 ? 'm³' : 'kWh'; }
+
+/* The outside meters (the providers' gas meter and two electricity meters), apart from the split:
+   their last two readings, from the months or from readings sent since, and the use between them. */
+function generalHTML() {
+  var recs = [];
+  state.data.months.forEach(function (m, k) { if (m.g) recs.push({ label: cap(mName(k)), g: m.g }); });
+  var p = pendingReadings();
+  if (p && p.g) recs.push({ label: tr('fGenSent', { d: fmtDayShort(p.t) }), g: p.g });
+  if (!recs.length) return '';
+  var cur = recs[recs.length - 1], prev = recs.length > 1 ? recs[recs.length - 2] : null;
+  var cell = function (v) { return '<td>' + (num(v) ? '<span class="drum">' + esc(drum(v)) + '</span>' : '—') + '</td>'; };
+  var h = '<section class="panel" id="f-general" aria-labelledby="f-gen-title"><h2 class="h2" id="f-gen-title">' + esc(tr('fGenTitle')) + '</h2>' +
+    '<p class="hint">' + esc(tr('fGenLead')) + '</p><div class="scroll"><table class="tbl meters"><thead><tr><th scope="col">' + esc(tr('meter')) + '</th>' +
+    (prev ? '<th scope="col">' + esc(prev.label) + '</th>' : '') + '<th scope="col">' + esc(cur.label) + '</th>' +
+    (prev ? '<th scope="col" class="num">' + esc(tr('usage')) + '</th>' : '') + '</tr></thead><tbody>';
+  GEN_KEYS.forEach(function (k, j) {
+    var a = prev ? prev.g[j] : null, b = cur.g[j];
+    h += '<tr><th scope="row">' + esc(tr(k)) + '</th>' + (prev ? cell(a) : '') + cell(b) +
+      (prev ? '<td class="num">' + (num(a) && num(b) ? esc(kwhStr(b - a) + ' ' + genUnit(j)) : '—') + '</td>' : '') + '</tr>';
+  });
+  return h + '</tbody></table></div></section>';
 }
 
 /* The front page shows the price per kWh on its own: the bills it came from stay under Administrare. */
@@ -3281,7 +3394,7 @@ function adminBarHTML() {
    password decrypts panel.json, the copy of the owner's key the owner stored when switching the
    panel on; with it the page commits citiri.json and nothing else. */
 
-state.cit = { info: undefined, key: null, draft: ['', '', '', '', ''], touched: {}, passMsg: '', saving: false };
+state.cit = { info: undefined, key: null, draft: ['', '', '', '', ''], gdraft: ['', '', ''], touched: {}, passMsg: '', saving: false };
 
 /* whether the panel is switched on (panel.json exists); a remembered password opens it at once */
 function loadPanelInfo() {
@@ -3302,6 +3415,7 @@ function unlockPanel(pass, remember, silent) {
     c.passMsg = '';
     var p = pendingReadings();
     c.draft = METERS.map(function (j) { return p ? numToInput(p.r[j]) : ''; });
+    c.gdraft = [0, 1, 2].map(function (j) { return p && p.g && p.g[j] != null ? numToInput(p.g[j]) : ''; });
     c.touched = {};
   }, function () {
     if (silent) { lsDel('ff-cit'); return; }
@@ -3331,7 +3445,15 @@ function renderPanel() {
         '<input type="text" id="' + id + '" data-cit="' + j + '" inputmode="decimal" autocomplete="off" spellcheck="false" enterkeyhint="next" value="' + esc(c.draft[j]) + '" aria-describedby="' + id + '-i ' + id + '-m">' +
         '<small class="info" id="' + id + '-i"></small><small class="msg" id="' + id + '-m"></small></div>';
     });
-    h += '</div><div id="c-est" aria-live="polite"></div><p class="sheet-msg" id="c-msg" role="status"></p><div class="sheet-actions"><button type="submit" class="btn primary" id="c-save">' + icon('check') + esc(tr('citSave')) + '</button>' +
+    h += '</div><div id="c-est" aria-live="polite"></div>' +
+      '<fieldset class="fs cit-gen"><legend class="eyebrow">' + esc(tr('citGenTitle')) + '</legend><p class="hint">' + esc(tr('citGenHint')) + '</p><div class="fgrid three">';
+    GEN_KEYS.forEach(function (k, j) {
+      var id = 'c-g' + j;
+      h += '<div class="field"><label for="' + id + '">' + esc(tr(k)) + '</label>' +
+        '<input type="text" id="' + id + '" data-citg="' + j + '" inputmode="decimal" autocomplete="off" spellcheck="false" enterkeyhint="next" value="' + esc(c.gdraft[j]) + '" aria-describedby="' + id + '-i ' + id + '-m">' +
+        '<small class="info" id="' + id + '-i"></small><small class="msg" id="' + id + '-m"></small></div>';
+    });
+    h += '</div></fieldset><p class="sheet-msg" id="c-msg" role="status"></p><div class="sheet-actions"><button type="submit" class="btn primary" id="c-save">' + icon('check') + esc(tr('citSave')) + '</button>' +
       '<button type="button" class="btn ghost" data-action="cit-lock">' + esc(tr('citLock')) + '</button></div></form>';
   }
   root.innerHTML = h + '</section><footer class="foot" id="foot"></footer></main>';
@@ -3341,9 +3463,11 @@ function renderPanel() {
   if (f && c.passMsg) f.focus();
 }
 
-/* the readings as typed: each must be a number, not below the last reading, and not absurdly far above */
-function citCheck(draft) {
-  var last = state.data.months[state.data.months.length - 1].r, out = { r: [], errors: {}, ok: true };
+/* the readings as typed: each must be a number, not below the last reading, and not absurdly far above.
+   The five are needed; the outside meters may be left empty. */
+function citCheck(draft, gdraft) {
+  var n = state.data.months.length, last = state.data.months[n - 1].r;
+  var out = { r: [], errors: {}, ok: true, rOk: true, g: [null, null, null], gErrors: {} };
   METERS.forEach(function (j) {
     var p = parseExpr(draft[j], 'plain'), e = null;
     if (p.empty) e = 'eRequired';
@@ -3352,13 +3476,22 @@ function citCheck(draft) {
     else if (p.value < last[j]) e = 'lower';
     else if (p.value - last[j] > LIMIT_KWH) e = 'eKwhBig';
     out.r[j] = p.value;
-    if (e) { out.errors[j] = e; out.ok = false; }
+    if (e) { out.errors[j] = e; out.ok = false; out.rOk = false; }
+  });
+  [0, 1, 2].forEach(function (j) {
+    var p = parseExpr(gdraft ? gdraft[j] : '', 'plain'), e = null, lg = lastGen(state.data, n, j);
+    if (p.empty) return;
+    if (p.error) e = p.error === 'plain' ? 'ePlain' : p.error === 'thousands' ? 'eThousands' : 'eNumber';
+    else if (p.value < 0) e = 'eNegative';
+    else if (lg && p.value < lg.v) e = 'lower';
+    else if (lg && p.value - lg.v > LIMIT_KWH) e = 'genBig';
+    if (e) { out.gErrors[j] = e; out.ok = false; } else out.g[j] = p.value;
   });
   return out;
 }
 
 function refreshCit(all) {
-  var c = state.cit, last = state.data.months[state.data.months.length - 1].r, chk = citCheck(c.draft);
+  var c = state.cit, n = state.data.months.length, last = state.data.months[n - 1].r, chk = citCheck(c.draft, c.gdraft);
   METERS.forEach(function (j) {
     var inp = $('c-r' + j), m = $('c-r' + j + '-m'), info = $('c-r' + j + '-i');
     if (!inp) return;
@@ -3368,8 +3501,18 @@ function refreshCit(all) {
     inp.setAttribute('aria-invalid', show ? 'true' : 'false');
     info.textContent = tr('lastRead', { v: kwhStr(last[j]) }) + (e ? '' : ' · ' + tr('usageNow', { v: kwhStr(chk.r[j] - last[j]) }));
   });
+  [0, 1, 2].forEach(function (j) {
+    var inp = $('c-g' + j), m = $('c-g' + j + '-m'), info = $('c-g' + j + '-i');
+    if (!inp) return;
+    var e = chk.gErrors[j], show = !!e && (all || c.touched['g' + j]), lg = lastGen(state.data, n, j);
+    m.className = 'msg' + (show ? ' bad' : '');
+    m.textContent = !show ? '' : e === 'lower' ? tr('citLower', { v: kwhStr(lg.v) }) : e === 'genBig' ? tr('citGenBig', { v: kwhStr(lg.v) }) : tr(e);
+    inp.setAttribute('aria-invalid', show ? 'true' : 'false');
+    info.textContent = !lg ? '' : tr('genLast', { v: kwhStr(lg.v), m: mName(lg.i) }) +
+      (num(chk.g[j]) ? ' · ' + tr('citUse', { v: kwhStr(chk.g[j] - lg.v), u: genUnit(j) }) : '');
+  });
   /* with all five readings in, what the electricity comes to at the latest price */
-  var box = $('c-est'), est = chk.ok ? elEstimate(chk.r) : null;
+  var box = $('c-est'), est = chk.rOk ? elEstimate(chk.r) : null;
   if (box) box.innerHTML = est ? estimateHTML(est) : '';
   return chk;
 }
@@ -3381,11 +3524,13 @@ function savePanelReadings() {
   if (!chk.ok) {
     msg.className = 'sheet-msg bad';
     msg.textContent = tr('citFix');
-    var bad = METERS.filter(function (j) { return chk.errors[j]; })[0];
+    var bad = METERS.filter(function (j) { return chk.errors[j]; })[0], gbad = [0, 1, 2].filter(function (j) { return chk.gErrors[j]; })[0];
     if (bad != null) $('c-r' + bad).focus();
+    else if (gbad != null) $('c-g' + gbad).focus();
     return;
   }
   var body = { t: todayISO(), r: chk.r };
+  if (chk.g.some(num)) body.g = chk.g;
   c.saving = true;
   btn.disabled = true;
   btn.textContent = tr('citSaving');
@@ -3755,17 +3900,22 @@ function bindWebEvents() {
       renderAll();
     }
   });
+  /* the readings page: the five meters (data-cit) and the three outside ones (data-citg) */
+  var citField = function (t) {
+    var j = t.getAttribute && t.getAttribute('data-cit'), g = t.getAttribute && t.getAttribute('data-citg');
+    return j != null ? { list: state.cit.draft, i: +j, key: +j } : g != null ? { list: state.cit.gdraft, i: +g, key: 'g' + g } : null;
+  };
   root.addEventListener('input', function (ev) {
-    var t = ev.target, j = t.getAttribute && t.getAttribute('data-cit');
-    if (j == null || !state.cit.key) return;
-    state.cit.draft[+j] = t.value;
-    if (String(t.value).trim() !== '') state.cit.touched[+j] = true;
+    var f = citField(ev.target);
+    if (!f || !state.cit.key) return;
+    f.list[f.i] = ev.target.value;
+    if (String(ev.target.value).trim() !== '') state.cit.touched[f.key] = true;
     refreshCit(false);
   });
   root.addEventListener('focusout', function (ev) {
-    var t = ev.target, j = t.getAttribute && t.getAttribute('data-cit');
-    if (j == null || !state.cit.key || state.cit.touched[+j]) return;
-    state.cit.touched[+j] = true;
+    var f = citField(ev.target);
+    if (!f || !state.cit.key || state.cit.touched[f.key]) return;
+    state.cit.touched[f.key] = true;
     refreshCit(false);
   });
   root.addEventListener('submit', function (ev) {
