@@ -3086,7 +3086,8 @@ function frontEmptyHTML() {
   var h = '<section class="panel stmt" aria-labelledby="f-title"><p class="eyebrow">' + esc(tr('fEyebrow')) + '</p>' +
     '<h2 class="mtitle f-empty-title" id="f-title">' + esc(tr('fEmptyTitle')) + '</h2>' +
     '<p class="stmt-lead">' + esc(tr('fEmptyText', { m: mName(n) })) + '</p>';
-  if (last && last.start) h += metersHTML(n - 1) + startPriceHTML(n - 1);
+  var pk = n ? state.data.months[n - 1].pk : null;
+  if (last && last.start) h += metersHTML(n - 1) + (num(pk) ? frontPriceHTML(pk) : '');
   return h + '</section>' + pendingHTML() + '<section class="panel" id="rules-panel" aria-labelledby="rules-title"></section>';
 }
 
@@ -3225,7 +3226,7 @@ function howBlockHTML(i, t, b) {
   } else {
     h += formula(c.byPrice ? tr('fElHow', { K: kwhTotal(c.K), p: priceStr(c.pk), v: lei(t.rowTot.curent / 100) }) :
       tr('fElPropHow', { b: lei(m.curent), K: kwhTotal(c.K) }));
-    if (c.byPrice) h += priceBoxHTML(i);
+    if (c.byPrice) h += frontPriceHTML(c.pk);
     h += readingsHTML(i);
     var com = APTS.map(function (a) { return c.shares[a] * c.kwh[4]; });
     h += aptTableHTML([tr('fColOwn'), tr('fColCommon'), tr('fColPay')], function (a) { return [kwhStr(c.kwh[a]), kwhStr(com[a]), kwhStr(c.kwhPay[a])]; },
@@ -3233,6 +3234,11 @@ function howBlockHTML(i, t, b) {
     h += '<p class="hint">' + esc(tr('commonNote')) + '</p>';
   }
   return h + '</div>';
+}
+
+/* The front page shows the price per kWh on its own: the bills it came from stay under Administrare. */
+function frontPriceHTML(pk) {
+  return '<div class="pricebox"><div class="pb-head"><span class="eyebrow">' + esc(tr('priceTitle')) + '</span><b class="pb-val">' + esc(priceStr(pk)) + '</b></div></div>';
 }
 
 /* one row per apartment: the basis of the split, then its amount in lei */
