@@ -388,3 +388,45 @@ body{margin:0;min-height:100vh;min-height:100dvh}
 .web-dlg .okline{margin:14px 0 0}
 .web-dlg .msg{margin:6px 0 0}
 .adm-foot{border-top:1px solid var(--line);padding-top:14px;margin-top:18px}
+a.btn{color:var(--ink)}
+a.btn.ghost{color:var(--ink-3)}
+
+/* ---- the front page: the month's bills, read-only ---- */
+.front{max-width:1000px}
+.stmt-head{display:grid;gap:12px;margin-bottom:16px}
+@media (min-width:640px){.stmt-head{grid-template-columns:minmax(0,1fr) auto;align-items:end}}
+.stmt-titles .eyebrow{margin-bottom:6px}
+.stmt-titles .mnav{margin-left:-2px}
+.f-empty-title{margin:6px 0 0;white-space:normal;text-wrap:balance}
+.stmt-lead{margin:8px 0 0;color:var(--ink-2);font-size:14.5px;max-width:62ch}
+.stmt-total{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 12px;padding:10px 14px;border-radius:12px;background:var(--surface-2)}
+.stmt-total b{font-family:var(--display);font-weight:760;font-stretch:105%;font-size:clamp(20px, 5.4vw, 30px);line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap}
+@media (min-width:640px){.stmt-total{display:grid;justify-items:end;padding:0;background:none}}
+.aptgrid{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:10px}
+@container (min-width:640px){.aptgrid{grid-template-columns:repeat(4, minmax(0, 1fr))}}
+@container (max-width:300px){.aptgrid{grid-template-columns:minmax(0, 1fr)}}
+.aptcard{container-type:inline-size;position:relative;min-width:0;padding:15px 14px 8px;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.aptcard::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--c)}
+.ac-name{margin:0;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:650;color:var(--ink-2)}
+.ac-amt{margin:6px 0 10px;font-weight:750;font-size:clamp(20px, 15cqi, 30px);line-height:1.1;letter-spacing:-.01em;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ac-amt .cur{font-size:.55em;font-weight:600;color:var(--ink-2);margin-left:.3em;letter-spacing:0}
+.ac-lines{margin:0;border-top:1px solid var(--line)}
+.ac-lines > div{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 0;font-size:13.5px}
+.ac-lines > div + div{border-top:1px dashed var(--line)}
+.ac-lines dt{min-width:0;color:var(--ink-2)}
+.ac-lines dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.f-bills{margin-top:12px}
+.howblock{padding:18px 0 6px;border-top:1px solid var(--line);max-width:780px}
+.f-round{max-width:780px}
+.f-how > .h2 + .howblock{margin-top:12px}
+.hb-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.hb-head .h3{margin:0}
+.hb-head b{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hb-formula{margin:6px 0 10px;font:500 13px/1.5 var(--mono);color:var(--ink-2);overflow-wrap:anywhere}
+.hb-sub{margin:16px 0 2px;font-size:12px;font-weight:650;letter-spacing:.03em;color:var(--ink-3)}
+.hb-tbl thead th{white-space:normal}
+.howblock .pricebox{margin-top:4px}
+.howblock .hint{margin-bottom:6px}
+.f-round{margin:16px 0 0}
+.adminbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.adminbar .muted{font-size:13px}

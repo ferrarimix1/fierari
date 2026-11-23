@@ -2511,7 +2511,29 @@ Object.assign(I18N.ro, {
   adminPassMismatch: 'Parolele nu coincid.',
   adminPassDone: 'Parola a fost schimbată. Dă-le chiriașilor parola nouă.',
   webConnectedT: 'Conectat. Acum poți adăuga și modifica luni.',
-  webDisconnectedT: 'Dispozitivul a fost deconectat.'
+  webDisconnectedT: 'Dispozitivul a fost deconectat.',
+  webKeyPass: 'Cheie și parolă',
+  fEyebrow: 'De plată',
+  fTotalsTitle: 'Totaluri pe categorii',
+  fGazHow: '{b} × cota de suprafață a fiecărui apartament',
+  fPeopleHow: '{b} ÷ {P} {w} = {v} de persoană',
+  fPeopleHowApprox: '{b} ÷ {P} {w} ≈ {v} de persoană',
+  fGunoiHow: '{v} de fiecare apartament × {n} = {t}',
+  fElHow: '{K} kWh × {p} = {v}',
+  fElPropHow: '{b} se împarte proporțional cu kWh-ii de plată ({K} kWh în total)',
+  fColApt: 'Apartament',
+  fColShare: 'Cota',
+  fColPeople: 'Persoane',
+  fColLei: 'Lei',
+  fColOwn: 'Contor propriu (kWh)',
+  fColCommon: 'Din comun (kWh)',
+  fColPay: 'De plată (kWh)',
+  fReadings: 'Citirile contoarelor',
+  fRound: 'Sumele sunt rotunjite la ban, astfel încât se adună exact: pe fiecare factură și pe fiecare apartament.',
+  fEmptyTitle: 'Încă nu sunt facturi de plată',
+  fEmptyText: 'Prima lună de plată, {m}, apare aici după ce se adaugă facturile ei.',
+  fBack: 'Facturile de plată',
+  fAdminNote: 'Administrare: aici se adaugă și se modifică lunile.'
 });
 Object.assign(I18N.en, {
   editorsOnly: 'Only the admin sees this button.',
@@ -2556,7 +2578,29 @@ Object.assign(I18N.en, {
   adminPassMismatch: 'The passwords do not match.',
   adminPassDone: 'Password changed. Give the tenants the new one.',
   webConnectedT: 'Connected. You can now add and change months.',
-  webDisconnectedT: 'This device was disconnected.'
+  webDisconnectedT: 'This device was disconnected.',
+  webKeyPass: 'Key and password',
+  fEyebrow: 'To pay',
+  fTotalsTitle: 'Totals by category',
+  fGazHow: "{b} × each apartment's floor-area share",
+  fPeopleHow: '{b} ÷ {P} {w} = {v} per person',
+  fPeopleHowApprox: '{b} ÷ {P} {w} ≈ {v} per person',
+  fGunoiHow: '{v} per apartment × {n} = {t}',
+  fElHow: '{K} kWh × {p} = {v}',
+  fElPropHow: '{b} is shared out in proportion to the kWh to pay ({K} kWh in all)',
+  fColApt: 'Apartment',
+  fColShare: 'Share',
+  fColPeople: 'People',
+  fColLei: 'Lei',
+  fColOwn: 'Own meter (kWh)',
+  fColCommon: 'Of common (kWh)',
+  fColPay: 'To pay (kWh)',
+  fReadings: 'Meter readings',
+  fRound: 'Amounts are rounded to the ban so that everything adds up exactly: for each bill and for each apartment.',
+  fEmptyTitle: 'No bills to pay yet',
+  fEmptyText: 'The first month to pay, {m}, shows here once its bills are added.',
+  fBack: 'Bills to pay',
+  fAdminNote: 'Admin: months are added and changed here.'
 });
 ICONS.key = '<circle cx="7.5" cy="15.5" r="3.5"/><path d="m10 13 8-8"/><path d="m15 8 3 3"/><path d="m17 6 2 2"/>';
 ICONS.lock = '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>';
@@ -2741,8 +2785,11 @@ function start(d) {
   state.comp = computeAll(d);
   state.sel = d.months.length - 1;
   state.canEdit = false;
+  state.view = viewFromHash();
+  state.fsel = null;
   renderAll();
   connectOwner(lsGet('ff-token'), false);
+  if (state.view === 'admin' && !lsGet('ff-token')) openAdmin();
 }
 
 /* ------------------------------------------------------------------ owner */
@@ -2854,11 +2901,272 @@ function renderFooter() {
   var d = state.data;
   var info = d.updated ? tr('updated', { d: new Intl.DateTimeFormat(I18N[state.lang].locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(d.updated + 'T00:00:00Z')) }) : '';
   var h = '<div><p>' + esc(info) + '</p><p>' + esc(tr('live')) + '</p></div><div class="foot-actions">';
-  h += '<button type="button" class="btn sm" data-action="export"' + (state.exporting ? ' disabled' : '') + '>' + icon('down') + esc(state.exporting ? tr('exporting') : tr('exportXlsx')) + '</button>';
-  if (state.canEdit) h += '<button type="button" class="btn sm" data-action="settings">' + icon('sliders') + esc(tr('settings')) + '</button>';
-  h += '<button type="button" class="btn sm" data-action="web-admin">' + icon('key') + esc(tr('webAdmin')) + '</button>';
+  if (state.view === 'admin') {
+    h += '<button type="button" class="btn sm" data-action="export"' + (state.exporting ? ' disabled' : '') + '>' + icon('down') + esc(state.exporting ? tr('exporting') : tr('exportXlsx')) + '</button>';
+    if (state.canEdit) h += '<button type="button" class="btn sm" data-action="settings">' + icon('sliders') + esc(tr('settings')) + '</button>';
+    h += '<button type="button" class="btn sm" data-action="web-admin">' + icon('key') + esc(tr('webKeyPass')) + '</button>';
+  } else {
+    /* the front page only shows; changes are made under Administrare */
+    h += '<a class="btn sm ghost" href="#admin" data-route="admin">' + icon('key') + esc(tr('webAdmin')) + '</a>';
+  }
   h += '<button type="button" class="btn sm ghost" data-action="web-lock">' + icon('lock') + esc(tr('webLock')) + '</button>';
   el.innerHTML = h + '</div>';
+}
+
+/* ------------------------------------------------------------------ the front page
+
+   What everyone sees first: the latest month's bills, read-only. Each apartment's amount with its
+   part of every bill, the total of each bill, and how each one was split, with the month's own
+   numbers. The full app, where the owner adds and changes months, is at #admin. */
+
+function viewFromHash() { return location.hash === '#admin' ? 'admin' : 'front'; }
+
+function setView(v, push) {
+  if (v === state.view) return;
+  state.view = v;
+  if (push) {
+    try { history.pushState(null, '', v === 'admin' ? '#admin' : location.pathname + location.search); } catch (e) { location.hash = v === 'admin' ? 'admin' : ''; }
+  }
+  if (v === 'front') {
+    state.sheet = null;
+    state.fsel = null;
+    document.body.classList.remove('locked');
+    var dlg = $('admin-dlg');
+    if (dlg && dlg.open) dlg.close();
+  }
+  if (!state.data) return;
+  renderAll();
+  window.scrollTo(0, 0);
+  if (v === 'admin' && !state.gh && !lsGet('ff-token')) openAdmin();
+}
+
+/* The apartment chips of the full app keep the #admin address (the app's own version writes #ap-N). */
+function setApt(a) {
+  state.apt = a;
+  lsSet('ff-apt', a == null ? '' : String(a));
+  var y = window.scrollY;
+  renderAll();
+  window.scrollTo(0, y);
+}
+
+/* the month shown on the front page: the latest with bills, unless another one was picked */
+function frontIndex(paid) {
+  if (!paid.length) return -1;
+  return state.fsel != null && paid.indexOf(state.fsel) !== -1 ? state.fsel : paid[paid.length - 1];
+}
+
+function billLabel(b) { return tr(b === 'curent' ? 'curentP' : b); }
+
+/* A month's amounts per bill and apartment, in bani. Each bill's four parts add up to the bill,
+   and each apartment's parts add up to what it pays (the same totals as everywhere else): every
+   part is its exact amount rounded down or up to the ban. */
+function centsTable(i) {
+  var c = state.comp[i], m = state.data.months[i];
+  var out = { rows: [], cell: {}, rowTot: {}, total: sum(c.cents), ok: true };
+  if (c.start || c.manual || !c.cents.every(num)) return out;
+  out.rows = BILLS.filter(function (b) { return b !== 'gunoi' || num(m.gunoi); });
+  var R = out.rows.map(function (b) {
+    return b === 'curent' ? 0 : b === 'gunoi' ? Math.round(m.gunoi * 100) * APTS.length : Math.round(m[b] * 100);
+  });
+  /* electricity takes the rest, so the bills add up to the total to pay to the ban */
+  R[out.rows.indexOf('curent')] = out.total - sum(R);
+  var real = out.rows.map(function (b) { return c.parts[b].map(function (v) { return v * 100; }); });
+  var X = roundTable(real, R, c.cents);
+  if (!X) { X = roundLoose(real, c.cents); out.ok = false; }
+  out.rows.forEach(function (b, r) { out.cell[b] = X[r]; out.rowTot[b] = R[r]; });
+  return out;
+}
+
+/* Rounds a table of amounts to whole numbers with the given row and column totals: each cell goes
+   down or up by less than 1, only cells that are not already whole move, and the result stays as
+   close as it can to the exact amounts (a cell at .67 goes up before one at .33). It is a tiny
+   minimum-cost flow: source → rows (the "ups" each row needs) → cells → columns → sink, where
+   rounding a cell up instead of down costs 1 − 2 × its fraction. Null when it cannot be done. */
+function roundTable(real, R, C) {
+  var nr = real.length, nc = C.length, EPS = 1e-6;
+  var X = real.map(function (row) { return row.map(function (v) { return Math.floor(v + EPS); }); });
+  var fr = real.map(function (row, r) { return row.map(function (v, a) { return v - X[r][a]; }); });
+  var needR = R.map(function (t, r) { return t - sum(X[r]); });
+  var needC = C.map(function (t, a) { return t - sum(X.map(function (row) { return row[a]; })); });
+  if (needR.some(function (v) { return v < 0; }) || needC.some(function (v) { return v < 0; }) || sum(needR) !== sum(needC)) return null;
+  var S = nr + nc, T = S + 1, g = [], cells = [];
+  for (var n = 0; n <= T; n++) g.push([]);
+  function edge(u, v, cap, cost) {
+    g[u].push({ v: v, cap: cap, cost: cost, rev: g[v].length });
+    g[v].push({ v: u, cap: 0, cost: -cost, rev: g[u].length - 1 });
+    return g[u][g[u].length - 1];
+  }
+  needR.forEach(function (k, r) { if (k > 0) edge(S, r, k, 0); });
+  needC.forEach(function (k, a) { if (k > 0) edge(nr + a, T, k, 0); });
+  fr.forEach(function (row, r) {
+    row.forEach(function (f, a) { if (f > EPS) cells.push({ r: r, a: a, e: edge(r, nr + a, 1, 1 - 2 * f) }); });
+  });
+  for (var flow = 0, need = sum(needR); flow < need; flow++) {
+    /* the cheapest way to hand out one more "up" (Bellman–Ford: the costs can be negative) */
+    var dist = g.map(function () { return Infinity; }), prev = [];
+    dist[S] = 0;
+    for (var it = 0; it < g.length; it++) {
+      var changed = false;
+      for (var u = 0; u < g.length; u++) {
+        if (dist[u] === Infinity) continue;
+        for (var j = 0; j < g[u].length; j++) {
+          var e = g[u][j];
+          if (e.cap > 0 && dist[u] + e.cost < dist[e.v] - 1e-9) { dist[e.v] = dist[u] + e.cost; prev[e.v] = [u, j]; changed = true; }
+        }
+      }
+      if (!changed) break;
+    }
+    if (dist[T] === Infinity) return null;
+    for (var v = T; v !== S; v = prev[v][0]) {
+      var pe = g[prev[v][0]][prev[v][1]];
+      pe.cap -= 1;
+      g[v][pe.rev].cap += 1;
+    }
+  }
+  cells.forEach(function (c) { if (c.e.cap === 0) X[c.r][c.a] += 1; });
+  return X;
+}
+
+/* fallback: round each cell, then make each apartment's column add up to what it pays */
+function roundLoose(real, C) {
+  var X = real.map(function (row) { return row.map(function (v) { return Math.round(v); }); });
+  C.forEach(function (t, a) {
+    var d = t - sum(X.map(function (row) { return row[a]; })), s = d > 0 ? 1 : -1;
+    var rows = X.map(function (_, r) { return r; }).sort(function (p, q) { return s * ((real[q][a] - X[q][a]) - (real[p][a] - X[p][a])); });
+    for (var n = 0; d !== 0 && n < rows.length * 4; n++) { X[rows[n % rows.length]][a] += s; d -= s; }
+  });
+  return X;
+}
+
+function renderFront() {
+  var paid = paidMonths(), i = frontIndex(paid);
+  var h = bandHTML() + '<main class="wrap front">' + (i < 0 ? frontEmptyHTML() : frontMonthHTML(i, paid)) +
+    '<footer class="foot" id="foot"></footer></main>';
+  root.innerHTML = h;
+  renderFooter();
+  if (i < 0) renderRules();
+}
+
+/* nothing to pay yet: when the first month will appear, the starting readings, and the rules */
+function frontEmptyHTML() {
+  var n = state.data.months.length, last = state.comp[n - 1];
+  var h = '<section class="panel stmt" aria-labelledby="f-title"><p class="eyebrow">' + esc(tr('fEyebrow')) + '</p>' +
+    '<h2 class="mtitle f-empty-title" id="f-title">' + esc(tr('fEmptyTitle')) + '</h2>' +
+    '<p class="stmt-lead">' + esc(tr('fEmptyText', { m: mName(n) })) + '</p>';
+  if (last && last.start) h += metersHTML(n - 1);
+  return h + '</section><section class="panel" id="rules-panel" aria-labelledby="rules-title"></section>';
+}
+
+function frontNavBtn(act, enabled, label, ic) {
+  return '<button type="button" class="nav-btn" data-action="' + act + '" aria-label="' + esc(tr(label)) + '"' + (enabled ? '' : ' disabled') + '>' + icon(ic) + '</button>';
+}
+
+function frontMonthHTML(i, paid) {
+  var c = state.comp[i], m = state.data.months[i], k = paid.indexOf(i), t = centsTable(i);
+  var h = '<section class="panel stmt" aria-labelledby="f-title"><div class="stmt-head"><div class="stmt-titles">' +
+    '<p class="eyebrow">' + esc(tr('fEyebrow')) + '</p><div class="mnav">';
+  if (paid.length > 1) h += frontNavBtn('f-prev', k > 0, 'prevMonth', 'prev');
+  h += '<h2 class="mtitle" id="f-title">' + esc(cap(mName(i))) + '</h2>';
+  if (paid.length > 1) h += frontNavBtn('f-next', k < paid.length - 1, 'nextMonth', 'next');
+  h += '</div></div><div class="stmt-total"><span class="eyebrow">' + esc(tr(c.manual ? 'totalPaid' : 'totalDue')) + '</span><b id="f-total">' + esc(lei(t.total / 100)) + '</b></div></div>';
+  h += '<div class="cwrap"><div class="aptgrid">';
+  APTS.forEach(function (a) {
+    h += '<article class="aptcard a' + a + '" aria-labelledby="f-ap' + a + '"><h3 class="ac-name" id="f-ap' + a + '"><span class="key" aria-hidden="true"></span>' + esc(aptName(a)) + '</h3>' +
+      '<p class="ac-amt">' + esc(money(c.cents[a] / 100)) + '<span class="cur">lei</span></p>';
+    if (t.rows.length) {
+      h += '<dl class="ac-lines">' + t.rows.map(function (b) {
+        return '<div><dt>' + esc(billLabel(b)) + '</dt><dd>' + esc(money(t.cell[b][a] / 100)) + '</dd></div>';
+      }).join('') + '</dl>';
+    }
+    h += '</article>';
+  });
+  h += '</div></div>';
+  if (c.manual) h += '<p class="noteline">' + esc(tr('manualNote', { v: lei(c.billTotal) })) + '</p>';
+  if (m.note) h += '<p class="note"><b>' + esc(tr('note')) + ':</b> ' + esc(m.note) + '</p>';
+  h += '</section>';
+  if (t.rows.length) h += frontTotalsHTML(i, t) + frontHowHTML(i, t);
+  return h;
+}
+
+/* each bill's total and how it is split */
+function frontTotalsHTML(i, t) {
+  var c = state.comp[i], m = state.data.months[i];
+  var h = '<section class="panel" aria-labelledby="f-tot-title"><h2 class="h2" id="f-tot-title">' + esc(tr('fTotalsTitle')) + '</h2><div class="bills f-bills">';
+  t.rows.forEach(function (b) {
+    var sub = b === 'curent' && c.byPrice ? tr('kwhTimes', { k: kwhTotal(c.K), p: priceStr(c.pk) }) :
+      b === 'gunoi' ? tr('gunoiExpr', { n: APTS.length, v: lei(m.gunoi) }) : m[b + 'Text'] ? exprDisplay(m[b + 'Text']) : '';
+    h += '<div class="bill"><span class="bname">' + esc(billLabel(b)) + '</span><span class="brule">' + esc(tr(ruleOf(c, b))) + '</span>' +
+      '<span class="bval">' + esc(lei(t.rowTot[b] / 100)) + (sub ? '<span class="expr">' + esc(sub) + '</span>' : '') + '</span></div>';
+  });
+  h += '</div><div class="totalrow"><span class="eyebrow">' + esc(tr('totalDue')) + '</span><span class="tval">' + esc(lei(t.total / 100)) + '</span></div>';
+  if (t.ok) h += '<p class="okline">' + icon('check') + esc(tr('sumOkDue')) + '</p>';
+  return h + '</section>';
+}
+
+function frontHowHTML(i, t) {
+  var h = '<section class="panel f-how" aria-labelledby="f-how-title"><h2 class="h2" id="f-how-title">' + esc(tr('howTitle')) + '</h2>';
+  t.rows.forEach(function (b) { h += howBlockHTML(i, t, b); });
+  return h + '<p class="hint f-round">' + esc(tr('fRound')) + '</p></section>';
+}
+
+function howBlockHTML(i, t, b) {
+  var c = state.comp[i], m = state.data.months[i];
+  var h = '<div class="howblock" id="f-how-' + b + '"><div class="hb-head"><h3 class="h3">' + esc(billLabel(b)) + '</h3><b>' + esc(lei(t.rowTot[b] / 100)) + '</b></div>';
+  var formula = function (s) { return '<p class="hb-formula">' + esc(s) + '</p>'; };
+  if (b === 'gaz') {
+    h += formula(tr('fGazHow', { b: lei(m.gaz) }));
+    h += aptTableHTML([tr('fColShare')], function (a) { return [pct(c.shares[a])]; }, [pct(1)], t.cell.gaz, t.rowTot.gaz);
+  } else if (b === 'digi' || b === 'apa') {
+    var per = m[b] / c.P, exact = Math.abs(per * 100 - Math.round(per * 100)) < 1e-6;
+    h += formula(tr(exact ? 'fPeopleHow' : 'fPeopleHowApprox', { b: lei(m[b]), P: c.P, w: peopleWord(c.P), v: lei(per) }));
+    h += aptTableHTML([tr('fColPeople')], function (a) { return [String(m.p[a])]; }, [String(c.P)], t.cell[b], t.rowTot[b]);
+  } else if (b === 'gunoi') {
+    h += formula(tr('fGunoiHow', { v: lei(m.gunoi), n: APTS.length, t: lei(t.rowTot.gunoi / 100) }));
+  } else {
+    h += formula(c.byPrice ? tr('fElHow', { K: kwhTotal(c.K), p: priceStr(c.pk), v: lei(t.rowTot.curent / 100) }) :
+      tr('fElPropHow', { b: lei(m.curent), K: kwhTotal(c.K) }));
+    if (c.byPrice) h += priceBoxHTML(i);
+    h += readingsHTML(i);
+    var com = APTS.map(function (a) { return c.shares[a] * c.kwh[4]; });
+    h += aptTableHTML([tr('fColOwn'), tr('fColCommon'), tr('fColPay')], function (a) { return [kwhStr(c.kwh[a]), kwhStr(com[a]), kwhStr(c.kwhPay[a])]; },
+      [kwhStr(sum(c.kwh.slice(0, 4))), kwhStr(c.kwh[4]), kwhStr(c.K)], t.cell.curent, t.rowTot.curent);
+    h += '<p class="hint">' + esc(tr('commonNote')) + '</p>';
+  }
+  return h + '</div>';
+}
+
+/* one row per apartment: the basis of the split, then its amount in lei */
+function aptTableHTML(cols, rowFn, tot, cents, totCents) {
+  var h = '<div class="scroll"><table class="tbl hb-tbl"><thead><tr><th scope="col">' + esc(tr('fColApt')) + '</th>' +
+    cols.map(function (s) { return '<th scope="col" class="num">' + esc(s) + '</th>'; }).join('') +
+    '<th scope="col" class="num">' + esc(tr('fColLei')) + '</th></tr></thead><tbody>';
+  APTS.forEach(function (a) {
+    h += '<tr><th scope="row"><span class="key a' + a + '" aria-hidden="true"></span> ' + esc(aptName(a)) + '</th>' +
+      rowFn(a).map(function (v) { return '<td class="num">' + esc(v) + '</td>'; }).join('') +
+      '<td class="num">' + esc(money(cents[a] / 100)) + '</td></tr>';
+  });
+  return h + '</tbody><tfoot><tr><th scope="row">' + esc(tr('total')) + '</th>' + tot.map(function (v) { return '<td class="num">' + esc(v) + '</td>'; }).join('') +
+    '<td class="num">' + esc(money(totCents / 100)) + '</td></tr></tfoot></table></div>';
+}
+
+/* the five meters: last month, this month, the use */
+function readingsHTML(i) {
+  var m = state.data.months[i], c = state.comp[i], prev = state.data.months[i - 1];
+  var h = '<p class="hb-sub">' + esc(tr('fReadings')) + '</p><div class="scroll"><table class="tbl meters"><thead><tr><th scope="col">' + esc(tr('meter')) + '</th>' +
+    '<th scope="col">' + esc(tr('lastMonth')) + '</th><th scope="col">' + esc(tr('thisMonth')) + '</th><th scope="col" class="num">' + esc(tr('usage')) + '</th></tr></thead><tbody>';
+  METERS.forEach(function (j) {
+    var key = j < 4 ? '<span class="key a' + j + '" aria-hidden="true"></span> ' : '';
+    var replaced = m.kwh && m.kwh[j] != null;
+    h += '<tr><th scope="row">' + key + esc(meterName(j)) + '</th><td><span class="drum">' + esc(drum(prev.r[j])) + '</span></td><td><span class="drum">' + esc(drum(m.r[j])) + '</span></td>' +
+      '<td class="num">' + esc(kwhStr(c.kwh[j])) + ' kWh' + (replaced ? '<span class="tag">' + esc(tr('replacedNote')) + '</span>' : '') + '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+
+/* the full app gets a way back to the front page */
+function adminBarHTML() {
+  return '<nav class="adminbar" aria-label="' + esc(tr('webAdmin')) + '"><a class="btn sm" href="' + esc(location.pathname + location.search) + '" data-route="front">' +
+    icon('prev') + esc(tr('fBack')) + '</a><span class="muted">' + esc(tr('fAdminNote')) + '</span></nav>';
 }
 
 /* ------------------------------------------------------------------ admin dialog */
@@ -2976,9 +3284,26 @@ function changePassword() {
 
 function bindWebEvents() {
   root.addEventListener('click', function (ev) {
+    var link = ev.target.closest('a[data-route]');
+    if (link && !(ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey)) {
+      ev.preventDefault();
+      setView(link.getAttribute('data-route'), true);
+      return;
+    }
     var t = ev.target.closest('[data-action]');
     if (!t) return;
     var act = t.getAttribute('data-action');
+    if (act === 'f-prev' || act === 'f-next') {
+      var paid = paidMonths(), k = paid.indexOf(frontIndex(paid)) + (act === 'f-prev' ? -1 : 1);
+      if (k < 0 || k >= paid.length) return;
+      state.fsel = paid[k];
+      var y = window.scrollY;
+      renderAll();
+      window.scrollTo(0, y);
+      var again = root.querySelector('[data-action="' + act + '"]:not([disabled])') || root.querySelector('[data-action^="f-"]:not([disabled])');
+      if (again) again.focus();
+      return;
+    }
     if (act === 'web-lang') {
       state.lang = t.getAttribute('data-v') === 'en' ? 'en' : 'ro';
       lsSet('ff-lang', state.lang);
@@ -3000,11 +3325,21 @@ function bindWebEvents() {
   root.addEventListener('submit', function (ev) {
     if (ev.target.id === 'gate-form') { ev.preventDefault(); submitGate(); }
   });
+  /* the browser's back and forward buttons move between the front page and #admin */
+  window.addEventListener('popstate', function () { setView(viewFromHash(), false); });
+  window.addEventListener('hashchange', function () { setView(viewFromHash(), false); });
 }
 
-/* While the password screen is up there is nothing to draw (a link change would otherwise try). */
+/* The front page by default, the full app under #admin. While the password screen is up there is
+   nothing to draw (a link change would otherwise try). */
 var coreRenderAll = renderAll;
-renderAll = function () { if (state.data) coreRenderAll(); };
+renderAll = function () {
+  if (!state.data) return;
+  if (state.view !== 'admin') { renderFront(); return; }
+  coreRenderAll();
+  var w = root.querySelector('.wrap');
+  if (w) w.insertAdjacentHTML('afterbegin', adminBarHTML());
+};
 
 if (typeof document !== 'undefined' && document.getElementById('app') && !document.getElementById('ff-data')) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

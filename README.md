@@ -2,6 +2,13 @@
 
 The house's utility bills, split between the four apartments. It is a single web page that phones can install like an app.
 
+- **The front page only shows.** After the password, everyone sees the latest month to pay:
+  - each apartment's amount, with its part of every bill;
+  - the total of each bill;
+  - how each bill was split, using that month's numbers (floor-area shares, people, meter readings, price per kWh).
+
+  The arrows next to the month go to earlier months. Nothing can be changed there.
+- **Changes are made under Administrare** (the link at the bottom, or https://fierari.avrusu.eu/#admin). That is the full app: adding and editing months, the history chart, the Excel download and the settings.
 - **Viewing needs a password.** The figures are stored only in `data.enc.json`, encrypted (AES-256-GCM, key derived with PBKDF2-SHA256, 310,000 iterations). This repository is public, and without the password the file is unreadable.
 - **Only the owner can change anything.** A device can add or edit months once it is connected with a GitHub key that may write to this repository. The key stays on that device. Each save is one commit to `data.enc.json`, and the site shows it to everyone within 1–2 minutes.
 
@@ -22,15 +29,15 @@ The house's utility bills, split between the four apartments. It is a single web
    - Expiration: up to one year
 
    Copy the key; GitHub shows it only once.
-6. **Connect your device.** Open https://fierari.avrusu.eu and enter the password. Press **Administrare** at the bottom, paste the key, then press **Conectează**. Repeat this on each device you want to add months from.
+6. **Connect your device.** Open https://fierari.avrusu.eu and enter the password. Press **Administrare** at the bottom; the page asks for the key. Paste it, then press **Conectează**. Repeat this on each device you want to add months from.
 
 Optional: under GitHub → Settings → Pages, *verify* `avrusu.eu`, so nobody else can ever attach your domain to their own GitHub site.
 
 ## Day to day
 
-- **Adding a month:** press "Adaugă …". DIGI (98) and rubbish (22 per apartment) are filled in; type gas, water, each electricity bill (total and kWh), the meter readings and the people.
+- **Adding a month:** go to Administrare and press "Adaugă …". DIGI (98) and rubbish (22 per apartment) are filled in; type gas, water, each electricity bill (total and kWh), the meter readings and the people. Afterwards, "Facturile de plată" at the top goes back to the front page.
 - **Tenants:** send them the address and the password. They can tick "Ține minte pe acest dispozitiv" and add the page to the home screen (Share → Add to Home Screen).
-- **Changing the password:** go to Administrare → Parola de acces. The data file is re-encrypted; give the tenants the new password.
+- **Changing the password:** go to Administrare → Cheie și parolă → Parola de acces. The data file is re-encrypted; give the tenants the new password.
 - **Keep the password safe.** Without it nobody can read the data, you included. The "Descarcă Excel" button gives you a readable copy at any time.
 - **Key expired or a phone lost:** delete the key on GitHub (Settings → Developer settings → tokens), make a new one and connect again. "Deconectează acest dispozitiv" (in Administrare) removes the key from a device.
 
@@ -41,7 +48,7 @@ Optional: under GitHub → Settings → Pages, *verify* `avrusu.eu`, so nobody e
 - **Rubbish:** the same fixed amount per apartment.
 - **Electricity:** each apartment pays the use on its own meter. Only the common meter's use is split, by floor-area share. Every kWh is paid at that month's price, which is the total lei on the electricity bills ÷ the total kWh they bill.
 
-Amounts are rounded to the ban so the four always add up exactly to the month's total.
+Amounts are rounded to the ban so the four always add up exactly to the month's total. On the front page, each apartment's part of each bill is rounded too: the parts of a bill add up to the bill, and an apartment's parts add up to what it pays. Each part stays within one ban of its exact amount, as close as those totals allow.
 
 ## Files
 
