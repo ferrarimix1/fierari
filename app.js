@@ -2467,7 +2467,7 @@ if (typeof document !== 'undefined' && document.getElementById('ff-data')) {
      (citiri.json). The owner switches it on under Administrare, which stores a copy of the
      owner's key in panel.json, encrypted with the panel password (AES-GCM, PBKDF2-SHA256). */
 
-var WEB = { repo: 'fierari', branch: 'main', path: 'data.json', pending: 'citiri.json', panel: 'panel.json', iter: 310000, minPanelPass: 10, api: 'https://api.github.com' };
+var WEB = { owner: 'ferrarimix1', repo: 'fierari', branch: 'main', path: 'data.json', pending: 'citiri.json', panel: 'panel.json', iter: 310000, minPanelPass: 10, api: 'https://api.github.com' };
 XLSX_URLS = ['vendor/xlsx.full.min.js'];
 
 Object.assign(I18N.ro, {
@@ -2493,6 +2493,9 @@ Object.assign(I18N.ro, {
   adminChecking: 'Se verifică…',
   adminBadToken: 'Cheia nu e valabilă. Verifică dacă ai copiat-o întreagă.',
   adminNoRepo: 'Cheia nu are acces la depozitul „fierari” sau la fișierul cu date.',
+  adminWrongAccount: 'Cheia e din contul GitHub „{u}”, dar site-ul e în contul „{o}”. Fă cheia fiind conectat ca {o}.',
+  webStale: 'Pagina s-a actualizat între timp. Reîncarcă pagina, apoi încearcă din nou.',
+  webNewVersion: 'Există o versiune nouă a paginii. Reîncarc-o când termini.',
   adminConnected: 'Acest dispozitiv e conectat ca {u}. Poți adăuga și modifica luni.',
   adminDisconnect: 'Deconectează acest dispozitiv',
   webConnectedT: 'Conectat. Acum poți adăuga și modifica luni.',
@@ -2578,6 +2581,9 @@ Object.assign(I18N.en, {
   adminChecking: 'Checking…',
   adminBadToken: 'That key does not work. Check that it was copied whole.',
   adminNoRepo: 'The key has no access to the "fierari" repository or its data file.',
+  adminWrongAccount: 'The key belongs to the GitHub account "{u}", but the site is in the account "{o}". Make the key while signed in as {o}.',
+  webStale: 'The page was updated in the meantime. Reload it, then try again.',
+  webNewVersion: 'A new version of the page is available. Reload it when you are done.',
   adminConnected: 'This device is connected as {u}. You can add and change months.',
   adminDisconnect: 'Disconnect this device',
   webConnectedT: 'Connected. You can now add and change months.',
@@ -2739,7 +2745,7 @@ function ghFileJSON(f) {
 }
 function ghErrorText(e) {
   var code = e && e.code;
-  return tr(code === 'conflict' ? 'webConflict' : code === 'badToken' ? 'webBadToken' : code === 'noAccess' ? 'webNoAccess' : code === 'offline' ? 'webOffline' : 'saveFailed');
+  return tr(code === 'stale' ? 'webStale' : code === 'conflict' ? 'webConflict' : code === 'badToken' ? 'webBadToken' : code === 'noAccess' ? 'webNoAccess' : code === 'offline' ? 'webOffline' : 'saveFailed');
 }
 
 /* ------------------------------------------------------------------ boot */
@@ -2817,14 +2823,16 @@ function start(d) {
 
 /* ------------------------------------------------------------------ owner */
 
-/* Checks a GitHub key: who it belongs to, and that it can read the data file in their "fierari"
-   repository. On success the owner's copy of the data replaces the one from the site. */
+/* Checks a GitHub key: that it belongs to the site's account and can read the data file in the
+   "fierari" repository. On success the owner's copy of the data replaces the one from the site. */
 function connectOwner(token, fromDialog) {
   if (!token) return Promise.resolve(false);
   return gh('GET', '/user', token).then(function (u) {
-    return loadFromGitHub(token, u.login).then(function (f) {
+    var login = u && u.login ? String(u.login) : '';
+    if (login.toLowerCase() !== WEB.owner.toLowerCase()) throw { code: 'wrongAccount', login: login };
+    return loadFromGitHub(token, WEB.owner).then(function (f) {
       var d = f.data;
-      state.gh = { token: token, owner: u.login, sha: f.sha };
+      state.gh = { token: token, owner: WEB.owner, login: login, sha: f.sha };
       lsSet('ff-token', token);
       if (JSON.stringify(d) !== JSON.stringify(state.data)) {
         state.data = d;
@@ -2868,7 +2876,11 @@ function saveData(nd, after) {
   nd.updated = todayISO();
   setSaving(true);
   setSheetMsg('', '');
-  return putData(nd, commitMessage(after)).then(function () {
+  /* never write with outdated code: the typed form is kept in this browser (ff-draft) for after the reload */
+  return isCurrent().then(function (cur) {
+    if (!cur) throw { code: 'stale' };
+    return putData(nd, commitMessage(after));
+  }).then(function () {
     lsDel('ff-draft');
     applyInPlace(nd, after);
   }, function (e) {
@@ -2877,7 +2889,8 @@ function saveData(nd, after) {
     if (code === 'conflict') {
       setSheetMsg(tr('webConflict'), 'warn');
       refreshFromGitHub();
-    } else if (code === 'badToken') setSheetMsg(tr('webBadToken'), 'bad');
+    } else if (code === 'stale') setSheetMsg(tr('webStale'), 'warn');
+    else if (code === 'badToken') setSheetMsg(tr('webBadToken'), 'bad');
     else if (code === 'noAccess') setSheetMsg(tr('webNoAccess'), 'bad');
     else if (code === 'offline') setSheetMsg(tr('webOffline'), 'bad');
     else setSheetMsg(tr('saveFailed'), 'bad');
@@ -3341,7 +3354,10 @@ function savePanelReadings() {
   btn.textContent = tr('citSaving');
   msg.className = 'sheet-msg';
   msg.textContent = '';
-  ghWriteFile(c.key, WEB.pending, JSON.stringify(body) + '\n', 'Citiri contoare ' + body.t).then(function () {
+  isCurrent().then(function (cur) {
+    if (!cur) throw { code: 'stale' };
+    return ghWriteFile(c.key, WEB.pending, JSON.stringify(body) + '\n', 'Citiri contoare ' + body.t);
+  }).then(function () {
     c.saving = false;
     state.pendingRaw = body;
     c.touched = {};
@@ -3356,6 +3372,41 @@ function savePanelReadings() {
     msg.className = 'sheet-msg bad';
     var code = e && e.code;
     msg.textContent = code === 'badToken' || code === 'noAccess' ? tr('citExpired') : ghErrorText(e);
+  });
+}
+
+/* ------------------------------------------------------------------ keeping an open page current
+
+   A page left open across an update keeps running the old code. When it comes back into view it
+   compares its app.js fingerprint with the published index.html and reloads (unless something is
+   being typed); after a long time away it reloads anyway, for fresh figures. Saves refuse to run
+   with outdated code. */
+function runningVersion() {
+  var s = document.querySelector('script[src*="app.js"]');
+  var m = s && /[?&]v=([0-9a-f]+)/.exec(s.getAttribute('src') || '');
+  return m ? m[1] : null;
+}
+/* true when this page runs the published code, or when that cannot be told */
+function isCurrent() {
+  var mine = runningVersion();
+  if (!mine) return Promise.resolve(true);
+  return fetch('index.html?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+    var m = /app\.js\?v=([0-9a-f]+)/.exec(t);
+    return !m || m[1] === mine;
+  }).catch(function () { return true; });
+}
+function busy() {
+  var dlg = $('admin-dlg');
+  return !!state.sheet || !!(dlg && dlg.open) || (state.view === 'panel' && !!state.cit.key);
+}
+var hiddenAt = 0;
+function onVisibility() {
+  if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+  var away = hiddenAt ? Date.now() - hiddenAt : 0;
+  if (!state.data || away < 60000) return;
+  isCurrent().then(function (cur) {
+    if (!cur) { if (busy()) showToast(tr('webNewVersion')); else location.reload(); }
+    else if (away > 15 * 60000 && !busy()) location.reload();
   });
 }
 
@@ -3442,7 +3493,10 @@ function activatePanel() {
   if (!g || btn.disabled) return;
   btn.disabled = true;
   m.textContent = '';
-  encryptJSON({ token: g.token, owner: g.owner }, p1).then(function (env) {
+  isCurrent().then(function (cur) {
+    if (!cur) throw { code: 'stale' };
+    return encryptJSON({ token: g.token, owner: g.owner }, p1);
+  }).then(function (env) {
     return ghWriteFile(g, WEB.panel, JSON.stringify(env) + '\n', 'Panoul de citiri: parolă nouă').then(function () { return env; });
   }).then(function (env) {
     state.panAdmin.status = 'on';
@@ -3511,7 +3565,10 @@ function onAdminSubmit(ev) {
     btn.disabled = true;
     btn.textContent = tr('adminChecking');
     msg.textContent = '';
-    connectOwner(token, true).then(function () {
+    isCurrent().then(function (cur) {
+      if (!cur) throw { code: 'stale' };
+      return connectOwner(token, true);
+    }).then(function () {
       /* stay open: the readings panel can be switched on right here */
       showToast(tr('webConnectedT'));
       state.panAdmin.status = undefined;
@@ -3521,7 +3578,11 @@ function onAdminSubmit(ev) {
       btn.disabled = false;
       btn.innerHTML = icon('key') + esc(tr('adminConnect'));
       msg.className = 'msg bad';
-      msg.textContent = tr(e && e.code === 'badToken' ? 'adminBadToken' : e && e.code === 'offline' ? 'webOffline' : 'adminNoRepo');
+      var code = e && e.code;
+      if (!code && typeof console !== 'undefined') console.error(e);
+      msg.textContent = code === 'badToken' ? tr('adminBadToken') : code === 'offline' ? tr('webOffline') : code === 'stale' ? tr('webStale') :
+        code === 'wrongAccount' ? tr('adminWrongAccount', { u: e.login || '?', o: WEB.owner }) :
+        tr('adminNoRepo') + (e && e.status ? ' (GitHub: ' + e.status + ')' : '');
     });
   } else if (ev.target.id === 'pan-form') activatePanel();
 }
@@ -3581,6 +3642,7 @@ function bindWebEvents() {
     if (ev.target.id === 'cit-unlock') { ev.preventDefault(); submitUnlock(); }
     else if (ev.target.id === 'cit-form') { ev.preventDefault(); savePanelReadings(); }
   });
+  document.addEventListener('visibilitychange', onVisibility);
   /* the browser's back and forward buttons move between the front page, #admin and #citiri */
   window.addEventListener('popstate', function () { setView(viewFromHash(), false); });
   window.addEventListener('hashchange', function () { setView(viewFromHash(), false); });
